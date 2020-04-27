@@ -1,0 +1,2 @@
+./generate-extension "Example" --extensionType widget --author "Somebody" --description "Example extension" --licence "MIT" 
+
