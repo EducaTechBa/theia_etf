@@ -21,7 +21,7 @@ export class RunButtonContribution extends AbstractViewContribution<RunButtonWid
         super({
             widgetId: RunButtonWidget.ID,
             widgetName: RunButtonWidget.LABEL,
-            defaultWidgetOptions: { area: 'left' },
+            defaultWidgetOptions: { area: 'top' },
             toggleCommandId: RunButtonCommand.id
         });
     }
@@ -46,7 +46,7 @@ export class RunButtonContribution extends AbstractViewContribution<RunButtonWid
      */
     registerCommands(commands: CommandRegistry): void {
         commands.registerCommand(RunButtonCommand, {
-            execute: () => super.openView({ activate: false, reveal: true })
+            execute: () => super.openView({ activate: true, reveal: true })
         });
     }
 

@@ -5,7 +5,7 @@ lib
 *-app/*
 !*-app/package.json
 yarn.lock
-/app/src-gen
-/app/gen-webpack.config.js
-/app/webpack.config.js
-
+src-gen
+gen-webpack.config.js
+webpack.config.js
+plugins

@@ -12,8 +12,10 @@
     "lib",
     "src"
   ],
+  
   "dependencies": {
-    "@theia/core": "latest"
+    "@theia/core": "latest",
+    "@theia/task": "latest"
   },
   "devDependencies": {
     "rimraf": "latest",
