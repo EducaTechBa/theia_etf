@@ -7,12 +7,14 @@ RUN apt -y update && apt -y install vim curl git build-essential gdb sudo
 ENV USER=theia
 ENV GROUP=theia
 ENV HOME=/home/${USER}
+ENV PASSWORD=theia
 
 RUN mkdir -p ${HOME}
 RUN groupadd -r ${GROUP} && \
     useradd -r -g ${GROUP} -d ${HOME} -s /sbin/nologin -c "Docker image user" ${USER} && \
     chown ${USER}:${GROUP} ${HOME} && \
-    usermod -a -G sudo ${USER}
+    usermod -a -G sudo ${USER} && \
+		echo "${PASSWORD}\n${PASSWORD}" | passwd ${USER}
 
 USER ${USER}
 
