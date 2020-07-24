@@ -1,56 +1,55 @@
 # Theia IDE
 
-## Prerequisites
+## Introduction
 
- - Node.js `>= 10.11.0` **AND** `< 12.x`.
-   - Preferably, **use** version `10.15.3`, it has the [active LTS](https://github.com/nodejs/Release).
-   - Node.js `11.x` is untested.
-   - Node.js `12.x` is [unsupported](https://github.com/eclipse-theia/theia/issues/5117).
- - [Yarn package manager](https://yarnpkg.com/en/docs/install) v1.7.0
- - git (If you would like to use the Git-extension too, you will need to have git version 2.11.0 or higher.)
+This is an online IDE built on top of the [Theia IDE](https://theia-ide.org/docs/composing_applications/) intended to be used for programming courses. The prerequisites can be found [here](https://github.com/eclipse-theia/theia/blob/master/doc/Developing.md). The application can be run on your host OS, but we recommend using Docker.
 
-Some additional tools and libraries are needed depending on your platform:
+## Docker
 
-- Linux
-  - [make](https://www.gnu.org/software/make/)
-  - [gcc](https://gcc.gnu.org/) (or another compiling toolchain)
-  - [pkg-config](https://www.freedesktop.org/wiki/Software/pkg-config/)
-  - build-essential: `sudo apt-get install build-essential`
-  - Dependencies for `native-keymap` node native extension:
-    - Debian-based: `sudo apt-get install libx11-dev libxkbfile-dev`
-    - Red Hat-based: `sudo yum install libX11-devel.x86_64 libxkbfile-devel.x86_64 # or .i686`
-    - FreeBSD: `sudo pkg install libX11`
+It is required for you to have [Docker](https://docs.docker.com/get-docker) installed on your system. The Dockerfile found in the root of this repository can be used to build a docker image and it is intended to provide the required development environment for this application. To build a docker image from this Dockerfile, run the following command in the repository root:
+```bash
+docker build -t theia-dev .
+```
+*theia-dev* is the name of the Docker image you just built. To create a container, run:
+```bash
+docker container run -d -p 3000:3000 --name theia theia-dev
+```
+This will create a container and run it in detached mode on port 3000 on the host machine. The name of the container is *theia* in this case (the string following the `--name` flag). When the container is initially created, this repository gets cloned into the `/home/theia/app` directory. To access the container shell, run the following in your command line:
+```bash
+docker container exec -it theia "bash"
+```
+*theia* being the name of the container. Once you bash into the container, your current working directory is `/home/theia/app`. The user you run *bash* as is **theia** and the password for this user is **theia** if needed.
 
-- Linux/MacOS
-  - [nvm](https://github.com/nvm-sh/nvm) is recommended to easily switch between Node.js versions.
+## Running the application
 
-- Windows
-  - We recommend using [`scoop`](https://scoop.sh/). The detailed steps are [here](#building-on-windows).
+The application needs to be built initially and dependencies need to be pulled. To do so, run the following at the root of the repository:
+```bash
+./build.sh
+```
+This script will use *yarn* (a nodejs package manager) to pull all the dependencies of the application. After that it runs the build process to compile the typescript source code to javascript.
 
+After the build is done, run the following script to start the application:
+```bash
+./start.sh
+```
+The script runs the *start* command defined in `app/package.json`. The default *port* used is `3000` and the default *hostname* is `0.0.0.0` (This is important when runnning the application in a container). An optional parameter is the path to the workspace folder you wish the application to open (Can be done in the application when it starts).
 
-## Building 
+For example:
+```bash
+./start.sh /path/to/workspace --port=8080 --hostname=0.0.0.0
+```
 
-- execute build.sh 
+## Creating a new extension
 
-## Starting
+For ease of use, to create a new extension, run the following script at the root of the repository:
+```bash
+./interactive-generate.sh
+```
+You will be prompted to give the name of the extension, to choose a template, to give the author name, licence and description. After that the extension should have been created. To include the extension in the application add the extension to **workspaces** in `./package.json` and to **dependencies** in `./app/package.json`.
 
-- execute start.sh 
+<!-- TODO: Improve this bit... -->
 
-### Example start
-
-- ./start.sh /path/to/workspace --port 8080  --hostname 0.0.0.0
-- plugins are automatically included in the run script of yarn, see /app/package.json scripts
-
-## Create new extension
-- Run the interactive-generate.sh script 
-- Name your extension 
-- Choose a type (must be one of the 3 provided)
-- Give it an author
-- Set the licence
-- Describe your extension
-- After that, add your extension to the workspaces(/package.json) and dependencies(/app/package.json) as shown below.
-
-Your extension should have a name that you provided and the /your-extension/package.json file should have it stored. Like this:
+<!-- Your extension should have a name that you provided and the /your-extension/package.json file should have it stored. Like this:
 
 ![](images/extension_package.png)
 
@@ -62,6 +61,4 @@ The /app/package.json file should look like this:
 
 ![](images/app_package.png)
 
-Version 0.0.0 can be found in the /your-extension/package.json file
-
-
+Version 0.0.0 can be found in the /your-extension/package.json file -->
