@@ -1,7 +1,9 @@
 FROM node:10.21.0
 
-RUN apt -y update && apt -y install vim curl git build-essential gdb sudo
-# RUN npm install -g yarn
+# Do package update and dependency instalation
+RUN apt -y update
+RUN apt -y install vim curl git build-essential gdb sudo
+RUN npm install -g yo generator-theia-extension
 
 # Add User
 ENV USER=theia
@@ -18,13 +20,11 @@ RUN groupadd -r ${GROUP} && \
 
 USER ${USER}
 
+# Prepare aplication repository for development
 EXPOSE 3000
 RUN mkdir ${HOME}/app
 WORKDIR ${HOME}/app
-# COPY --chown=${USER}:${GROUP} . .
 RUN git clone https://github.com/rfejzic1/theia_etf.git .
-# RUN ./build.sh
-# CMD ./start.sh --hostname=0.0.0.0
+
+# Keep the container running...
 CMD tail -f /dev/null
-# RUN yarn && yarn theia build
-# CMD yarn start --hostname=0.0.0.0
