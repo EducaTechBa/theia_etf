@@ -5,4 +5,3 @@ rm -rf browser-app/ electron-app/ README.md  lerna.json package.json .gitignore 
 mv ./$1/* ./
 rm -rf $1
 
-

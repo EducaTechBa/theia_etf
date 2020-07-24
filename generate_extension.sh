@@ -13,8 +13,6 @@ read -r licence
 printf "Description: "
 read -r description
 
-./generate-extension.sh $extensionName --extensionType $extensionType --author $author --licence $licence --description $description
+./extension_generator.sh $extensionName --extensionType $extensionType --author $author --licence $licence --description $description
 
 echo "Created extension $extensionName"
-
-
