@@ -33,7 +33,8 @@ export class RunButtonWidget extends ReactWidget {
     }
 
     protected displayMessage(): void {
-        this.taskService.runTaskByLabel('Run');
+        // What is a cache token nubmer???
+        this.taskService.runTaskByLabel(0, 'Run');
     }
 
 }
