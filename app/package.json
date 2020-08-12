@@ -41,7 +41,8 @@
     "@theia/variable-resolver": "latest",
     "@theia/vsx-registry": "latest",
     "@theia/workspace": "latest",
-    "run-button": "0.0.0"
+    "run-button": "0.0.0",
+    "assignments-view": "0.0.0"
   },
   "devDependencies": {
     "@theia/cli": "latest"
