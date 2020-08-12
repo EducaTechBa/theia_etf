@@ -39,7 +39,7 @@ export class AssignmentsTree extends TreeImpl {
 
     makeCourseNode(c: Course) {
         const node: CourseNode = {
-            id: c.name,
+            id: c.id,
             name: c.name,
             parent: undefined,
             expanded: false,
@@ -52,7 +52,7 @@ export class AssignmentsTree extends TreeImpl {
 
     makeTutorialNode(t: Tutorial) {
         const node: TutorialNode = {
-            id: t.name,
+            id: t.id,
             name: t.name,
             parent: undefined,
             expanded: false,
@@ -65,7 +65,7 @@ export class AssignmentsTree extends TreeImpl {
 
     makeAssignmentNode(a: Assignment) {
         const node: AssignmentNode = {
-            id: a.title,
+            id: a.id,
             name: a.title,
             parent: undefined,
             expanded: false,

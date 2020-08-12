@@ -33,12 +33,15 @@ export class AssignmentsViewWidget extends TreeWidget {
         const coursesRoot: Courses = {
             courses: [
                 {
+                    id: 'RPR',
                     name: 'RPR',
                     tutorials: [
                         {
+                            id: 'RPR/T1',
                             name: 'Tutorijal 1',
                             assignments: [
                                 {
+                                    id: 'RPR/T1/Z1',
                                     title: 'Zadatak 1',
                                     language: 'c++'
                                 }
@@ -47,12 +50,15 @@ export class AssignmentsViewWidget extends TreeWidget {
                     ]
                 },
                 {
+                    id: 'UUP',
                     name: 'UUP',
                     tutorials: [
                         {
+                            id: 'UUP/T1',
                             name: 'Tutorijal 1',
                             assignments: [
                                 {
+                                    id: 'UUP/T1/Z1',
                                     title: 'Zadatak 1',
                                     language: 'c++'
                                 }
@@ -78,7 +84,7 @@ export class AssignmentsViewWidget extends TreeWidget {
 
     protected handleDblClickEvent(node: TreeNode | undefined, event: React.MouseEvent<HTMLElement>): void {
         if(node && AssignmentNode.is(node)) {
-            this.messageService.info(node.assignment.title);
+            this.messageService.info(node.assignment.id);
             event.stopPropagation();
         } else {
             this.model.openNode(node);
