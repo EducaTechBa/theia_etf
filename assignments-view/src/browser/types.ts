@@ -1,10 +1,18 @@
-interface Family {
-    name: string;
-    members: Member[];
+interface Courses {
+    courses: Course[];
 }
 
-interface Member {
-    firstName: string;
-    nickName: string;
-    children?: Member[];
+interface Course {
+    name: string;
+    tutorials: Tutorial[];
+}
+
+interface Tutorial {
+    name: string;
+    assignments: Assignment[];
+}
+
+interface Assignment {
+    title: string;
+    language: string;
 }

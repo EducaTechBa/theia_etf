@@ -7,27 +7,19 @@ import {
     TreeNode,
     ExpandableTreeNode
 } from "@theia/core/lib/browser";
-import { FamilyRootNode, MemberNode } from "./assignments-tree";
+import { CoursesRootNode, CourseNode, TutorialNode, AssignmentNode } from "./assignments-tree";
+import { MessageService } from '@theia/core';
 
 @injectable()
 export class AssignmentsViewWidget extends TreeWidget {
     static readonly ID = 'assignments-view:widget';
     static readonly LABEL = 'Assignments View';
 
-    // @postConstruct()
-    // protected async init(): Promise<void> {
-    //     this.id = AssignmentsViewWidget.ID;
-    //     this.title.label = AssignmentsViewWidget.LABEL;
-    //     this.title.caption = AssignmentsViewWidget.LABEL;
-    //     this.title.closable = true;
-    //     this.title.iconClass = 'fa fa-window-maximize'; // example widget icon.
-    //     this.update();
-    // }
-
     constructor(
         @inject(TreeProps) readonly props: TreeProps,
         @inject(TreeModel) readonly model: TreeModel,
-        @inject(ContextMenuRenderer) contextMenuRenderer: ContextMenuRenderer
+        @inject(ContextMenuRenderer) contextMenuRenderer: ContextMenuRenderer,
+        @inject(MessageService) private readonly messageService: MessageService
     ) {
         super(props, model, contextMenuRenderer);
 
@@ -37,53 +29,46 @@ export class AssignmentsViewWidget extends TreeWidget {
         this.title.closable = true;
         this.title.iconClass = 'fa fa-window-maximize'; // example widget icon.
 
-        const family: Family = {
-            name: "Vestrit",
-            members: [
+        // Data here!!!
+        const coursesRoot: Courses = {
+            courses: [
                 {
-                    firstName: "Ephron",
-                    nickName: "Ephy",
-                    children: [
+                    name: 'RPR',
+                    tutorials: [
                         {
-                            firstName: "Keffria",
-                            nickName: "Keff",
-                            children: [
+                            name: 'Tutorijal 1',
+                            assignments: [
                                 {
-                                    firstName: "Wintrow",
-                                    nickName: "Win"
-                                },
-                                {
-                                    firstName: "Malta",
-                                    nickName: "Ederling Queen",
-                                    children: [
-                                        {
-                                            firstName: "Ephron Bendir",
-                                            nickName: "Ben"
-                                        }
-                                    ]
-                                },
-                                {
-                                    firstName: "Selden",
-                                    nickName: "Ederling Prince"
+                                    title: 'Zadatak 1',
+                                    language: 'c++'
                                 }
                             ]
-                        },
+                        }
+                    ]
+                },
+                {
+                    name: 'UUP',
+                    tutorials: [
                         {
-                            firstName: "Althea",
-                            nickName: "Alth"
+                            name: 'Tutorijal 1',
+                            assignments: [
+                                {
+                                    title: 'Zadatak 1',
+                                    language: 'c++'
+                                }
+                            ]
                         }
                     ]
                 }
             ]
         };
-
-        const root: FamilyRootNode = {
+        const root: CoursesRootNode = {
             id: "assignments-root",
             name: "assignments-root",
             visible: false,
             parent: undefined,
             children: [],
-            family
+            courses: coursesRoot
         };
 
         this.model.root = root;
@@ -91,11 +76,28 @@ export class AssignmentsViewWidget extends TreeWidget {
         // this.update();
     }
 
-    protected isExpandable(node: TreeNode): node is ExpandableTreeNode {
-        if (FamilyRootNode.is(node)) return true;
+    protected handleDblClickEvent(node: TreeNode | undefined, event: React.MouseEvent<HTMLElement>): void {
+        if(node && AssignmentNode.is(node)) {
+            this.messageService.info(node.assignment.title);
+            event.stopPropagation();
+        } else {
+            this.model.openNode(node);
+            event.stopPropagation();
+        }
+    }
 
-        if (MemberNode.is(node) && node.member.children)
-            return node.member.children.length > 0;
+    protected isExpandable(node: TreeNode): node is ExpandableTreeNode {
+        if (CoursesRootNode.is(node)) {
+            return true;
+        }
+
+        if (CourseNode.is(node) && node.course.tutorials) {
+            return node.course.tutorials.length > 0;
+        }
+
+        if (TutorialNode.is(node) && node.tutorial.assignments) {
+            return node.tutorial.assignments.length > 0;
+        }
 
         return false;
     }
