@@ -9,6 +9,7 @@ import {
 } from "@theia/core/lib/browser";
 import { CoursesRootNode, CourseNode, TutorialNode, AssignmentNode } from "./assignments-tree";
 import { MessageService } from '@theia/core';
+import { AssignmentsDataProvider } from './assignments-data-provider';
 
 @injectable()
 export class AssignmentsViewWidget extends TreeWidget {
@@ -19,7 +20,8 @@ export class AssignmentsViewWidget extends TreeWidget {
         @inject(TreeProps) readonly props: TreeProps,
         @inject(TreeModel) readonly model: TreeModel,
         @inject(ContextMenuRenderer) contextMenuRenderer: ContextMenuRenderer,
-        @inject(MessageService) private readonly messageService: MessageService
+        @inject(MessageService) private readonly messageService: MessageService,
+        // @inject(AssignmentsDataProvider) private readonly dataProvider: AssignmentsDataProvider,
     ) {
         super(props, model, contextMenuRenderer);
 
@@ -27,63 +29,42 @@ export class AssignmentsViewWidget extends TreeWidget {
         this.title.label = AssignmentsViewWidget.LABEL;
         this.title.caption = AssignmentsViewWidget.LABEL;
         this.title.closable = true;
-        this.title.iconClass = 'fa fa-window-maximize'; // example widget icon.
+        this.title.iconClass = 'fa fa-window-maximize';
 
-        // Data here!!!
-        const coursesRoot: Courses = {
-            courses: [
-                {
-                    id: 'RPR',
-                    name: 'RPR',
-                    tutorials: [
-                        {
-                            id: 'RPR/T1',
-                            name: 'Tutorijal 1',
-                            assignments: [
-                                {
-                                    id: 'RPR/T1/Z1',
-                                    title: 'Zadatak 1',
-                                    language: 'c++'
-                                }
-                            ]
-                        }
-                    ]
-                },
-                {
-                    id: 'UUP',
-                    name: 'UUP',
-                    tutorials: [
-                        {
-                            id: 'UUP/T1',
-                            name: 'Tutorijal 1',
-                            assignments: [
-                                {
-                                    id: 'UUP/T1/Z1',
-                                    title: 'Zadatak 1',
-                                    language: 'c++'
-                                }
-                            ]
-                        }
-                    ]
+        const dataProvider = new AssignmentsDataProvider();
+
+        dataProvider
+            .getCoursesData()
+            .then((coursesData: Courses) => {
+                if (coursesData.courses === []) {
+                    this.messageService.info('No active courses found. If you think that this is an issue, contact your supervisor.')
                 }
-            ]
-        };
-        const root: CoursesRootNode = {
+
+                this.model.root = this.makeRootNode(coursesData);
+                this.update();
+            })
+            .catch(err => {
+                this.messageService.info(`Failed to fetch any data`);
+                this.messageService.log(err.toString());
+            });
+
+        this.model.root = this.makeRootNode({ courses: [] });
+        this.update();
+    }
+
+    private makeRootNode(courses: Courses) {
+        return {
             id: "assignments-root",
             name: "assignments-root",
             visible: false,
             parent: undefined,
             children: [],
-            courses: coursesRoot
+            courses
         };
-
-        this.model.root = root;
-        // Maybe????
-        // this.update();
     }
 
     protected handleDblClickEvent(node: TreeNode | undefined, event: React.MouseEvent<HTMLElement>): void {
-        if(node && AssignmentNode.is(node)) {
+        if (node && AssignmentNode.is(node)) {
             this.messageService.info(node.assignment.id);
             event.stopPropagation();
         } else {

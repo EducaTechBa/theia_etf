@@ -16,6 +16,5 @@ interface Tutorial {
 
 interface Assignment {
     id: string,
-    title: string;
-    language: string;
+    name: string;
 }

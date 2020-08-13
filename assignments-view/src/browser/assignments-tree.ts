@@ -66,7 +66,7 @@ export class AssignmentsTree extends TreeImpl {
     makeAssignmentNode(a: Assignment) {
         const node: AssignmentNode = {
             id: a.id,
-            name: a.title,
+            name: a.name,
             parent: undefined,
             expanded: false,
             selected: false,
