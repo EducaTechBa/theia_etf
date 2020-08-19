@@ -29,7 +29,7 @@ export class AssignmentsTree extends TreeImpl {
 
     makeDirectory(dir: Directory) {
         const node: DirectoryNode = {
-            id: dir.id,
+            id: dir.path,
             name: dir.name,
             parent: undefined,
             expanded: false,
@@ -42,7 +42,7 @@ export class AssignmentsTree extends TreeImpl {
 
     makeAssignmentNode(a: Assignment) {
         const node: AssignmentNode = {
-            id: a.id,
+            id: a.path,
             name: a.name,
             parent: undefined,
             expanded: false,

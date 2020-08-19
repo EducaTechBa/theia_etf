@@ -11,7 +11,6 @@ export class AssignmentsDataProvider {
             const url = this.makeURL('/services/auth.php');
             await fetch(url, {
                 method: "post",
-                credentials: 'include',
                 body: `login=${encodeURIComponent(
                     username
                 )}&password=${encodeURIComponent(password)}`,
@@ -65,22 +64,21 @@ export class AssignmentsDataProvider {
     }
 
     private mapCourseDataToCourseDirectory(courseInfo: CourseInfo, courseData: any): Directory {
-        const path = courseInfo.abbrev;
         const tutorials = courseData.data;
-        const subdirectories = tutorials.map((t: any) => this.mapTutorialDataToDirectory(t));
+        const subdirectories = tutorials.map((t: any) => this.mapTutorialDataToDirectory(courseInfo.id, t));
 
         return {
-            id: path,
-            name: courseInfo.abbrev,
-            path: path,
+            id: courseInfo.id,
+            name: courseInfo.name,
+            path: courseInfo.abbrev,
             subdirectories,
             assignments: []
         };
     }
 
-    private mapTutorialDataToDirectory(tutorial: any): Directory {
+    private mapTutorialDataToDirectory(courseID: string, tutorial: any): Directory {
         const path = tutorial.path;
-        const assignments = tutorial.items.map((a: any) => this.mapAssignmentData(a));
+        const assignments = tutorial.items.map((a: any) => this.mapAssignmentData(courseID, a));
 
         return {
             id: path,
@@ -91,14 +89,21 @@ export class AssignmentsDataProvider {
         }
     }
 
-    private mapAssignmentData(assignment: any): Assignment {
+    private mapAssignmentData(courseID: string, assignment: any): Assignment {
         const path = assignment.path;
+        const files = assignment.files.map((f: any) => this.mapFileDataToFileName(f));
 
         return {
-            id: path,
+            id: assignment.id,
             name: assignment.name,
-            path: path
+            courseID,
+            path,
+            files
         };
+    }
+
+    private mapFileDataToFileName(file: any): string {
+        return typeof file === "string" ? file : file.filename;
     }
 
 }

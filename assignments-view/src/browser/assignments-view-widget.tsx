@@ -10,6 +10,7 @@ import {
 import { DirectoryRootNode, DirectoryNode, AssignmentNode } from "./assignments-tree";
 import { MessageService } from '@theia/core';
 import { AssignmentsDataProvider } from './assignments-data-provider';
+import { AssignmentGenerator } from './assignments-generator';
 
 @injectable()
 export class AssignmentsViewWidget extends TreeWidget {
@@ -21,7 +22,6 @@ export class AssignmentsViewWidget extends TreeWidget {
         @inject(TreeModel) readonly model: TreeModel,
         @inject(ContextMenuRenderer) contextMenuRenderer: ContextMenuRenderer,
         @inject(MessageService) private readonly messageService: MessageService,
-        // @inject(AssignmentsDataProvider) private readonly dataProvider: AssignmentsDataProvider,
     ) {
         super(props, model, contextMenuRenderer);
 
@@ -32,13 +32,6 @@ export class AssignmentsViewWidget extends TreeWidget {
         this.title.iconClass = 'fa fa-window-maximize';
 
         const dataProvider = new AssignmentsDataProvider();
-
-        // TODO: Think of a way not to do login here
-        // TODO: Clean up code
-        // TODO: Implement file generation
-        // TODO: Fix data model... !!!!!!! include info for generatin request for file copy
-        //          Before copying file, check if file exists!
-        //          Does the service handle it or do I have to???
 
         dataProvider.login('hstudente', 'password')
             .then(text => {
@@ -79,7 +72,11 @@ export class AssignmentsViewWidget extends TreeWidget {
 
     protected handleDblClickEvent(node: TreeNode | undefined, event: React.MouseEvent<HTMLElement>): void {
         if (node && AssignmentNode.is(node)) {
-            this.messageService.info(node.assignment.id);
+            this.messageService.info("Generating assignments sources...");
+            AssignmentGenerator
+                .generateAssignmentSources(node.assignment)
+                .then(() => this.messageService.info("Generated sources successfully!"))
+                .catch(err => this.messageService.info(err));
             event.stopPropagation();
         } else {
             this.model.openNode(node);
