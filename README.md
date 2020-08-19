@@ -43,7 +43,7 @@ For example:
 
 For ease of use, to create a new extension, run the following script at the root of the repository:
 ```bash
-./interactive-generate.sh
+./generate-extension.sh
 ```
 You will be prompted to give the name of the extension, to choose a template, to give the author name, licence and description. After that the extension should have been created. To include the extension in the application add the extension to **workspaces** in `./package.json` and to **dependencies** in `./app/package.json`.
 
