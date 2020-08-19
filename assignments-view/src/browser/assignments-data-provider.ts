@@ -1,10 +1,28 @@
-// import { injectable } from 'inversify';
-
-// @injectable()
 export class AssignmentsDataProvider {
 
-    private static readonly BASE_URL = 'http://localhost';
-    private static readonly PHPSESSID = '7ee86009e719097ee412d796c0ad2458';
+    private static readonly BASE_URL = 'http://localhost:8080';
+
+    private makeURL(url: string): string {
+        return `${AssignmentsDataProvider.BASE_URL}${url}`;
+    }
+    
+    public async login(username: string, password: string): Promise<void> {
+        try {
+            const url = this.makeURL('/services/auth.php');
+            await fetch(url, {
+                method: "post",
+                credentials: 'include',
+                body: `login=${encodeURIComponent(
+                    username
+                )}&password=${encodeURIComponent(password)}`,
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded"
+                }
+            });
+        } catch (err) {
+            console.log(err);
+        }
+    }
 
     public async getCoursesDataDummy(): Promise<Courses> {
         return Promise.resolve({
@@ -38,16 +56,18 @@ export class AssignmentsDataProvider {
         return Promise.resolve({ courses });
     }
 
-    private makeURL(url: string) {
-        return `${AssignmentsDataProvider.BASE_URL}${url}&PHPSESSID=${AssignmentsDataProvider.PHPSESSID}`;
-    }
-
     private async getStudentCoursesInfo(): Promise<CourseInfo[]> {
-        const url = this.makeURL('/assignment/ws.php?action=courses');
-        const res = await fetch(url).then(res => res.json());
+        const url = this.makeURL('/ass ignment/ws.php?action=courses');
+        const res = await fetch(url, {
+            credentials: 'include'
+        });
 
-        return res.data.map((course: any) => ({
-            id: course.id,
+        const json = await res.json();
+
+        console.log(JSON.stringify(json));
+
+        return json.data.map((course: any) => ({
+            id: course.abbrev,
             name: course.name
         }));
     }
@@ -55,7 +75,9 @@ export class AssignmentsDataProvider {
     private async getCourse(courseInfo: CourseInfo): Promise<Course> {
         const courseURL = (id: string) => this.makeURL(`/assignment/ws.php?action=assignments&external=1&course=${id}`);
 
-        return fetch(courseURL(courseInfo.id))
+        return fetch(courseURL(courseInfo.id), {
+            credentials: 'include'
+        })
             .then(res => res.json())
             .then(courseTutorials => this.mapResponseToCourse(courseInfo, courseTutorials));
     }

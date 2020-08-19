@@ -33,19 +33,33 @@ export class AssignmentsViewWidget extends TreeWidget {
 
         const dataProvider = new AssignmentsDataProvider();
 
-        dataProvider
-            .getCoursesData()
-            .then((coursesData: Courses) => {
-                if (coursesData.courses === []) {
-                    this.messageService.info('No active courses found. If you think that this is an issue, contact your supervisor.')
-                }
+        // TODO: Think of a way not to do login here
+        // TODO: Clean up code
+        // TODO: Implement file generation
+        // TODO: Fix data model... !!!!!!! include info for generatin request for file copy
+        //          Before copying file, check if file exists!
+        //          Does the service handle it or do I have to???
 
-                this.model.root = this.makeRootNode(coursesData);
-                this.update();
+        dataProvider.login('hstudente', 'password')
+            .then(text => {
+                console.log("Login Response Text: " + text);
+                dataProvider
+                    .getCoursesData()
+                    .then((coursesData: Courses) => {
+                        if (coursesData.courses === []) {
+                            this.messageService.info('No active courses found. If you think that this is an issue, contact your supervisor.')
+                        }
+
+                        this.model.root = this.makeRootNode(coursesData);
+                        this.update();
+                    })
+                    .catch(err => {
+                        this.messageService.info(`Failed to fetch any data`);
+                        this.messageService.log(err.toString());
+                    });
             })
             .catch(err => {
-                this.messageService.info(`Failed to fetch any data`);
-                this.messageService.log(err.toString());
+                console.log(err);
             });
 
         this.model.root = this.makeRootNode({ courses: [] });
