@@ -1,20 +1,19 @@
-interface Courses {
-    courses: Course[];
+interface CourseInfo {
+    id: string;
+    name: string;
+    abbrev: string;
 }
 
-interface Course {
-    id: string,
+interface Directory {
+    id: string;
     name: string;
-    tutorials: Tutorial[];
-}
-
-interface Tutorial {
-    id: string,
-    name: string;
+    path: string;
+    subdirectories: Directory[];
     assignments: Assignment[];
-}
+};
 
 interface Assignment {
-    id: string,
+    id: string;
     name: string;
-}
+    path: string;
+};

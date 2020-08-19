@@ -5,7 +5,7 @@ export class AssignmentsDataProvider {
     private makeURL(url: string): string {
         return `${AssignmentsDataProvider.BASE_URL}${url}`;
     }
-    
+
     public async login(username: string, password: string): Promise<void> {
         try {
             const url = this.makeURL('/services/auth.php');
@@ -24,40 +24,17 @@ export class AssignmentsDataProvider {
         }
     }
 
-    public async getCoursesDataDummy(): Promise<Courses> {
-        return Promise.resolve({
-            courses: [
-                {
-                    id: 'UUP',
-                    name: 'UUP',
-                    tutorials: [
-                        {
-                            id: 'UUP/T1',
-                            name: 'Tutorial 1',
-                            assignments: [
-                                {
-                                    id: 'UUP/T1/Z1',
-                                    name: 'Zadatak 1'
-                                }
-                            ]
-                        }
-                    ]
-                }
-            ]
-        });
-    }
-
-    public async getCoursesData(): Promise<Courses> {
+    public async getCoursesData(): Promise<Directory[]> {
         const coursesInfo: CourseInfo[] = await this.getStudentCoursesInfo();
 
-        const coursePromises = coursesInfo.map((course: CourseInfo) => this.getCourse(course));
-        const courses: Course[] = await Promise.all(coursePromises);
+        const coursePromises = coursesInfo.map((course: CourseInfo) => this.getCourseDirectory(course));
+        const courseDirectories: Directory[] = await Promise.all(coursePromises);
 
-        return Promise.resolve({ courses });
+        return Promise.resolve(courseDirectories);
     }
 
     private async getStudentCoursesInfo(): Promise<CourseInfo[]> {
-        const url = this.makeURL('/ass ignment/ws.php?action=courses');
+        const url = this.makeURL('/assignment/ws.php?action=courses');
         const res = await fetch(url, {
             credentials: 'include'
         });
@@ -67,53 +44,148 @@ export class AssignmentsDataProvider {
         console.log(JSON.stringify(json));
 
         return json.data.map((course: any) => ({
-            id: course.abbrev,
-            name: course.name
+            id: course.id,
+            name: course.name,
+            abbrev: course.abbrev
         }));
     }
 
-    private async getCourse(courseInfo: CourseInfo): Promise<Course> {
+    private async getCourseDirectory(courseInfo: CourseInfo): Promise<Directory> {
+        return this
+            .getCourseData(courseInfo)
+            .then(courseData => this.mapCourseDataToCourseDirectory(courseInfo, courseData));
+    }
+
+    private async getCourseData(courseInfo: CourseInfo): Promise<any> {
         const courseURL = (id: string) => this.makeURL(`/assignment/ws.php?action=assignments&external=1&course=${id}`);
 
         return fetch(courseURL(courseInfo.id), {
             credentials: 'include'
-        })
-            .then(res => res.json())
-            .then(courseTutorials => this.mapResponseToCourse(courseInfo, courseTutorials));
+        }).then(res => res.json())
     }
 
-    private mapResponseToCourse(courseInfo: CourseInfo, courseTutorials: any): Course {
-        const tutorialsData = courseTutorials.data;
-        const tutorials: Tutorial[] = tutorialsData.map((c9Tutorial: any) => this.mapResponseToTutorial(c9Tutorial));
+    private mapCourseDataToCourseDirectory(courseInfo: CourseInfo, courseData: any): Directory {
+        const path = courseInfo.abbrev;
+        const tutorials = courseData.data;
+        const subdirectories = tutorials.map((t: any) => this.mapTutorialDataToDirectory(t));
 
         return {
-            id: courseInfo.id,
-            name: courseInfo.name,
-            tutorials
-        }
+            id: path,
+            name: courseInfo.abbrev,
+            path: path,
+            subdirectories,
+            assignments: []
+        };
     }
 
-    private mapResponseToTutorial(c9Tutorial: any): Tutorial {
-        const c9Assignments = c9Tutorial.items;
-        const assignments: Assignment[] = c9Assignments.map((c9Assignment: any) => this.mapResponseToAssignment(c9Assignment));
+    private mapTutorialDataToDirectory(tutorial: any): Directory {
+        const path = tutorial.path;
+        const assignments = tutorial.items.map((a: any) => this.mapAssignmentData(a));
 
         return {
-            id: c9Tutorial.id,
-            name: c9Tutorial.name,
+            id: path,
+            name: tutorial.name,
+            path: path,
+            subdirectories: [],
             assignments
         }
     }
 
-    private mapResponseToAssignment(c9Assignment: any): Assignment {
+    private mapAssignmentData(assignment: any): Assignment {
+        const path = assignment.path;
+
         return {
-            id: c9Assignment.id,
-            name: c9Assignment.name
+            id: path,
+            name: assignment.name,
+            path: path
         };
     }
 
 }
 
-interface CourseInfo {
-    id: string;
-    name: string;
+/*
+{
+    "success": "true",
+    "message": "",
+    "data": [
+        {
+            "id": 1,
+            "type": "tutorial",
+            "name": "Tutorijal 1",
+            "path": "UUP\/T1",
+            "hidden": "false",
+            "items": [
+                {
+                    "id": 2,
+                    "type": "zadatak",
+                    "name": "Zadatak 1",
+                    "path": "UUP\/T1\/Z1",
+                    "files": [
+                        {
+                            "filename": ".autotest",
+                            "binary": false,
+                            "show": false
+                        },
+                        {
+                            "filename": "main.c",
+                            "binary": false,
+                            "show": false
+                        }
+                    ],
+                    "hidden": "false",
+                    "items": []
+                },
+                {
+                    "id": 3,
+                    "type": "task",
+                    "name": "Zadatak 2",
+                    "path": "UUP\/T1\/Z2",
+                    "files": [
+                        {
+                            "filename": ".autotest",
+                            "binary": false,
+                            "show": false
+                        },
+                        {
+                            "filename": "main.c",
+                            "binary": false,
+                            "show": false
+                        }
+                    ],
+                    "hidden": "false",
+                    "items": []
+                }
+            ]
+        },
+        {
+            "id": 4,
+            "type": "tutorial",
+            "name": "Tutorijal 2",
+            "path": "UUP\/T2",
+            "hidden": "false",
+            "items": [
+                {
+                    "id": 5,
+                    "type": "zadatak",
+                    "name": "Zadatak 1",
+                    "path": "UUP\/T2\/Z1",
+                    "files": [
+                        {
+                            "filename": ".autotest",
+                            "binary": false,
+                            "show": false
+                        },
+                        {
+                            "filename": "main.c",
+                            "binary": false,
+                            "show": false
+                        }
+                    ],
+                    "hidden": "false",
+                    "items": []
+                }
+            ]
+        }
+    ]
 }
+*/
