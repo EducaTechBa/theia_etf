@@ -6,23 +6,6 @@ export class AssignmentsDataProvider {
         return `${AssignmentsDataProvider.BASE_URL}${url}`;
     }
 
-    public async login(username: string, password: string): Promise<void> {
-        try {
-            const url = this.makeURL('/services/auth.php');
-            await fetch(url, {
-                method: "post",
-                body: `login=${encodeURIComponent(
-                    username
-                )}&password=${encodeURIComponent(password)}`,
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded"
-                }
-            });
-        } catch (err) {
-            console.log(err);
-        }
-    }
-
     public async getCoursesData(): Promise<Directory[]> {
         const coursesInfo: CourseInfo[] = await this.getStudentCoursesInfo();
 
@@ -39,8 +22,6 @@ export class AssignmentsDataProvider {
         });
 
         const json = await res.json();
-
-        console.log(JSON.stringify(json));
 
         return json.data.map((course: any) => ({
             id: course.id,
@@ -111,90 +92,3 @@ export class AssignmentsDataProvider {
     }
 
 }
-
-/*
-{
-    "success": "true",
-    "message": "",
-    "data": [
-        {
-            "id": 1,
-            "type": "tutorial",
-            "name": "Tutorijal 1",
-            "path": "UUP\/T1",
-            "hidden": "false",
-            "items": [
-                {
-                    "id": 2,
-                    "type": "zadatak",
-                    "name": "Zadatak 1",
-                    "path": "UUP\/T1\/Z1",
-                    "files": [
-                        {
-                            "filename": ".autotest",
-                            "binary": false,
-                            "show": false
-                        },
-                        {
-                            "filename": "main.c",
-                            "binary": false,
-                            "show": false
-                        }
-                    ],
-                    "hidden": "false",
-                    "items": []
-                },
-                {
-                    "id": 3,
-                    "type": "task",
-                    "name": "Zadatak 2",
-                    "path": "UUP\/T1\/Z2",
-                    "files": [
-                        {
-                            "filename": ".autotest",
-                            "binary": false,
-                            "show": false
-                        },
-                        {
-                            "filename": "main.c",
-                            "binary": false,
-                            "show": false
-                        }
-                    ],
-                    "hidden": "false",
-                    "items": []
-                }
-            ]
-        },
-        {
-            "id": 4,
-            "type": "tutorial",
-            "name": "Tutorijal 2",
-            "path": "UUP\/T2",
-            "hidden": "false",
-            "items": [
-                {
-                    "id": 5,
-                    "type": "zadatak",
-                    "name": "Zadatak 1",
-                    "path": "UUP\/T2\/Z1",
-                    "files": [
-                        {
-                            "filename": ".autotest",
-                            "binary": false,
-                            "show": false
-                        },
-                        {
-                            "filename": "main.c",
-                            "binary": false,
-                            "show": false
-                        }
-                    ],
-                    "hidden": "false",
-                    "items": []
-                }
-            ]
-        }
-    ]
-}
-*/
