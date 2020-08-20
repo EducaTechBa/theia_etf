@@ -9,10 +9,8 @@ export class AssignmentGenerator {
     public static async generateAssignmentSources(assignment: Assignment) {
         const { courseID, id, files } = assignment;
         const urls = files.map(filename => 
-            this.makeURL(`/assignment/ws.php?action=getFile&course=${courseID}&external=1&task_direct=${id}&file=${filename}&view`)
+            this.makeURL(`/assignment/ws.php?action=getFile&course=${courseID}&external=1&task_direct=${id}&file=${filename}`)
         );
-
-        console.log(JSON.stringify(urls));
 
         const promises = urls.map(url => fetch(url, { credentials: 'include' }).then(res => res.text()));
         const data = await Promise.all(promises);

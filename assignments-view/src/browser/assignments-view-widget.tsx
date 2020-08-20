@@ -5,12 +5,17 @@ import {
     TreeProps,
     TreeWidget,
     TreeNode,
-    ExpandableTreeNode
+    ExpandableTreeNode,
+    ConfirmDialog,
+    OpenerService
 } from "@theia/core/lib/browser";
 import { DirectoryRootNode, DirectoryNode, AssignmentNode } from "./assignments-tree";
 import { MessageService } from '@theia/core';
 import { AssignmentsDataProvider } from './assignments-data-provider';
-import { AssignmentGenerator } from './assignments-generator';
+// import { AssignmentGenerator } from './assignments-generator';
+import { WorkspaceService } from '@theia/workspace/lib/browser'
+import { FileSystem } from '@theia/filesystem/lib/common'
+import URI from '@theia/core/lib/common/uri';
 
 @injectable()
 export class AssignmentsViewWidget extends TreeWidget {
@@ -22,6 +27,9 @@ export class AssignmentsViewWidget extends TreeWidget {
         @inject(TreeModel) readonly model: TreeModel,
         @inject(ContextMenuRenderer) contextMenuRenderer: ContextMenuRenderer,
         @inject(MessageService) private readonly messageService: MessageService,
+        @inject(WorkspaceService) private readonly workspaceService: WorkspaceService,
+        @inject(FileSystem) private readonly fileSystem: FileSystem,
+        @inject(OpenerService) private readonly openerService: OpenerService,
     ) {
         super(props, model, contextMenuRenderer);
 
@@ -72,16 +80,45 @@ export class AssignmentsViewWidget extends TreeWidget {
 
     protected handleDblClickEvent(node: TreeNode | undefined, event: React.MouseEvent<HTMLElement>): void {
         if (node && AssignmentNode.is(node)) {
-            this.messageService.info("Generating assignments sources...");
-            AssignmentGenerator
-                .generateAssignmentSources(node.assignment)
-                .then(() => this.messageService.info("Generated sources successfully!"))
+            this.assignmentDirectoryGeneration(node.assignment)
                 .catch(err => this.messageService.info(err));
             event.stopPropagation();
         } else {
             this.model.openNode(node);
             event.stopPropagation();
         }
+    }
+
+    private async assignmentDirectoryGeneration(assignment: Assignment) {
+        const directoryExists = await this.workspaceService.containsSome([assignment.path]);
+        const workspaceURI = this.workspaceService.workspace?.uri;
+        const assignmentDirectoryURI = `${workspaceURI}/${assignment.path}`;
+
+        if(directoryExists) {
+            // TODO: Offer override or open workspace?
+            const dialog = new ConfirmDialog({
+                title: `${assignment.name}`,
+                msg: `Directory '${assignment.path}' already exists. Do you want do override the directory and lose all changes?`,
+                ok: "Yes",
+                cancel: "No"
+            });
+            const doOverride = await dialog.open();
+            if(doOverride) {
+                await this.fileSystem.delete(assignmentDirectoryURI);
+            } else {
+                return;
+            }
+        }
+
+        // AssignmentGenerator.generateAssignmentSources(assignment)
+
+        await this.fileSystem.createFolder(assignmentDirectoryURI);
+        await this.fileSystem.createFile(assignmentDirectoryURI + '/main.c');
+        this.messageService.info("Generated sources successfully!");
+
+        const uri = new URI(assignmentDirectoryURI);
+        const opener = await this.openerService.getOpener(uri);
+        opener.open(uri);
     }
 
     protected isExpandable(node: TreeNode): node is ExpandableTreeNode {
