@@ -15,7 +15,6 @@ export class AssignmentGenerator {
     }
 
     public async generateAssignmentSources(assignmentDirectory: string, assignment: Assignment) {
-        console.log("Generation started...");
         const { courseID, id, files } = assignment;
         const filesWithURL = files.map(file => {
             const url = this.makeURL(`/assignment/ws.php?action=getFile&course=${courseID}&external=1&task_direct=${id}&file=${file.filename}&replace=true`)
