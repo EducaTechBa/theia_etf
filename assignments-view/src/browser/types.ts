@@ -17,5 +17,5 @@ interface Assignment {
     name: string;
     path: string;
     courseID: string;
-    files: string[];
+    files: any[];
 };

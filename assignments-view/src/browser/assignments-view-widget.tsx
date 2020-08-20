@@ -6,15 +6,14 @@ import {
     TreeWidget,
     TreeNode,
     ExpandableTreeNode,
-    ConfirmDialog,
+    open,
     OpenerService
 } from "@theia/core/lib/browser";
 import { DirectoryRootNode, DirectoryNode, AssignmentNode } from "./assignments-tree";
 import { MessageService } from '@theia/core';
 import { AssignmentsDataProvider } from './assignments-data-provider';
-// import { AssignmentGenerator } from './assignments-generator';
-import { WorkspaceService } from '@theia/workspace/lib/browser'
-import { FileSystem } from '@theia/filesystem/lib/common'
+import { AssignmentGenerator } from './assignments-generator';
+import { WorkspaceService } from '@theia/workspace/lib/browser';
 import URI from '@theia/core/lib/common/uri';
 
 @injectable()
@@ -28,8 +27,8 @@ export class AssignmentsViewWidget extends TreeWidget {
         @inject(ContextMenuRenderer) contextMenuRenderer: ContextMenuRenderer,
         @inject(MessageService) private readonly messageService: MessageService,
         @inject(WorkspaceService) private readonly workspaceService: WorkspaceService,
-        @inject(FileSystem) private readonly fileSystem: FileSystem,
         @inject(OpenerService) private readonly openerService: OpenerService,
+        @inject(AssignmentGenerator) private readonly assignmentGenerator: AssignmentGenerator,
     ) {
         super(props, model, contextMenuRenderer);
 
@@ -41,26 +40,18 @@ export class AssignmentsViewWidget extends TreeWidget {
 
         const dataProvider = new AssignmentsDataProvider();
 
-        dataProvider.login('hstudente', 'password')
-            .then(text => {
-                console.log("Login Response Text: " + text);
-                dataProvider
-                    .getCoursesData()
-                    .then((directories: Directory[]) => {
-                        if (directories === []) {
-                            this.messageService.info('No active courses found. If you think that this is an issue, contact your supervisor.')
-                        }
+        dataProvider
+            .getCoursesData()
+            .then((directories: Directory[]) => {
+                if (directories === []) {
+                    this.messageService.info('No active courses found. If you think that this is an issue, contact your supervisor.');
+                }
 
-                        this.model.root = this.makeRootNode(directories);
-                        this.update();
-                    })
-                    .catch(err => {
-                        this.messageService.info(`Failed to fetch any data`);
-                        this.messageService.log(err.toString());
-                    });
+                this.model.root = this.makeRootNode(directories);
+                this.update();
             })
             .catch(err => {
-                console.log(err);
+                this.messageService.info(`Failed to fetch any assignment data...`);
             });
 
         this.model.root = this.makeRootNode([]);
@@ -90,35 +81,25 @@ export class AssignmentsViewWidget extends TreeWidget {
     }
 
     private async assignmentDirectoryGeneration(assignment: Assignment) {
+        this.messageService.info(`Generating sources for '${assignment.path}'...`);
+
         const directoryExists = await this.workspaceService.containsSome([assignment.path]);
-        const workspaceURI = this.workspaceService.workspace?.uri;
+        const workspaceURI = this.workspaceService.workspace?.uri || '';
         const assignmentDirectoryURI = `${workspaceURI}/${assignment.path}`;
 
-        if(directoryExists) {
-            // TODO: Offer override or open workspace?
-            const dialog = new ConfirmDialog({
-                title: `${assignment.name}`,
-                msg: `Directory '${assignment.path}' already exists. Do you want do override the directory and lose all changes?`,
-                ok: "Yes",
-                cancel: "No"
-            });
-            const doOverride = await dialog.open();
-            if(doOverride) {
-                await this.fileSystem.delete(assignmentDirectoryURI);
-            } else {
-                return;
-            }
+        if (!directoryExists) {
+            await this.assignmentGenerator.generateAssignmentSources(assignmentDirectoryURI, assignment)
+            this.messageService.info(`Sources for ${assignment.path} generated successfully!`);
         }
 
-        // AssignmentGenerator.generateAssignmentSources(assignment)
+        const filesToOpen = assignment.files
+            .filter(file => file.show && !file.binary)
+            .map(file => {
+                const fileURI = new URI(`${assignmentDirectoryURI}/${file.filename}`);
+                return open(this.openerService, fileURI);
+            });
 
-        await this.fileSystem.createFolder(assignmentDirectoryURI);
-        await this.fileSystem.createFile(assignmentDirectoryURI + '/main.c');
-        this.messageService.info("Generated sources successfully!");
-
-        const uri = new URI(assignmentDirectoryURI);
-        const opener = await this.openerService.getOpener(uri);
-        opener.open(uri);
+        await Promise.all(filesToOpen);
     }
 
     protected isExpandable(node: TreeNode): node is ExpandableTreeNode {

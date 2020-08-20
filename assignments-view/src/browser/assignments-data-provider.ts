@@ -1,6 +1,6 @@
 export class AssignmentsDataProvider {
 
-    private static readonly BASE_URL = 'http://localhost:8080';
+    private static readonly BASE_URL = '';
 
     private makeURL(url: string): string {
         return `${AssignmentsDataProvider.BASE_URL}${url}`;
@@ -91,7 +91,7 @@ export class AssignmentsDataProvider {
 
     private mapAssignmentData(courseID: string, assignment: any): Assignment {
         const path = assignment.path;
-        const files = assignment.files.map((f: any) => this.mapFileDataToFileName(f));
+        const files = assignment.files.map((f: any) => this.mapFileData(f));
 
         return {
             id: assignment.id,
@@ -102,8 +102,12 @@ export class AssignmentsDataProvider {
         };
     }
 
-    private mapFileDataToFileName(file: any): string {
-        return typeof file === "string" ? file : file.filename;
+    private mapFileData(file: any): any {
+        return typeof file === "string" ? {
+            binary: false,
+            show: true,
+            filename: file
+        } : file;
     }
 
 }

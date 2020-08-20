@@ -11,12 +11,14 @@ import {
     Tree
 } from "@theia/core/lib/browser";
 import { AssignmentsTree } from "./assignments-tree";
+import { AssignmentGenerator } from './assignments-generator';
 
 import '../../src/browser/style/index.css';
 
 export default new ContainerModule(bind => {
     bindViewContribution(bind, AssignmentsViewContribution);
     bind(FrontendApplicationContribution).toService(AssignmentsViewContribution);
+    bind(AssignmentGenerator).toSelf().inSingletonScope();
     bind(WidgetFactory).toDynamicValue(ctx => ({
         id: AssignmentsViewWidget.ID,
         createWidget: () => createAssignmentViewWidget(ctx.container)
