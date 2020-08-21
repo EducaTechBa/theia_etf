@@ -81,13 +81,12 @@ export class AssignmentsViewWidget extends TreeWidget {
     }
 
     private async assignmentDirectoryGeneration(assignment: Assignment) {
-        this.messageService.info(`Generating sources for '${assignment.path}'...`);
-
         const directoryExists = await this.workspaceService.containsSome([assignment.path]);
         const workspaceURI = this.workspaceService.workspace?.uri || '';
         const assignmentDirectoryURI = `${workspaceURI}/${assignment.path}`;
 
         if (!directoryExists) {
+            this.messageService.info(`Generating sources for '${assignment.path}'...`);
             await this.assignmentGenerator.generateAssignmentSources(assignmentDirectoryURI, assignment)
             this.messageService.info(`Sources for ${assignment.path} generated successfully!`);
         }
