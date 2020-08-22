@@ -8,6 +8,6 @@
     "lerna": "2.4.0"
   },
   "workspaces": [
-    "assignments-view", "run-button", "app"
+    "autotest-view", "assignments-view", "run-button", "app"
   ]
 }

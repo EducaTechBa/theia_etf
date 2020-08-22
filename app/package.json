@@ -33,7 +33,8 @@
     "@theia/vsx-registry": "latest",
     "@theia/workspace": "latest",
     "run-button": "0.0.0",
-    "assignments-view": "0.0.0"
+    "assignments-view": "0.0.0",
+    "autotest-view": "0.0.0"
   },
   "devDependencies": {
     "@theia/cli": "latest"
@@ -41,10 +42,10 @@
   "scripts": {
     "prepare": "yarn run clean && yarn build && yarn run download:plugins",
     "clean": "theia clean",
-    "build": "theia build",
+    "build": "theia build --mode development",
     "download:plugins": "theia download:plugins",
     "start": "theia start --plugins=local-dir:plugins",
-    "watch": "theia build"
+    "watch": "theia build --mode development"
   },
   "theia": {
     "target": "browser",

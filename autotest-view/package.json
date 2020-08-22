@@ -1,0 +1,33 @@
+{
+  "name": "autotest-view",
+  "keywords": [
+    "theia-extension"
+  ],
+  "version": "0.0.0",
+  "description": "Desct",
+  
+  "author": "Rijad",
+  
+  "files": [
+    "lib",
+    "src"
+  ],
+  "dependencies": {
+    "@theia/core": "latest"
+  },
+  "devDependencies": {
+    "rimraf": "latest",
+    "typescript": "latest"
+  },
+  "scripts": {
+    "prepare": "yarn run clean && yarn run build",
+    "clean": "rimraf lib",
+    "build": "tsc",
+    "watch": "tsc -w"
+  },
+  "theiaExtensions": [
+    {
+      "frontend": "lib/browser/autotest-view-frontend-module"
+    }
+  ]
+}
