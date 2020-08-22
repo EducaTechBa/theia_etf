@@ -5,11 +5,16 @@ import {
     TreeProps,
     TreeWidget,
     TreeNode,
-    ExpandableTreeNode
+    ExpandableTreeNode,
+    open,
+    OpenerService
 } from "@theia/core/lib/browser";
 import { DirectoryRootNode, DirectoryNode, AssignmentNode } from "./assignments-tree";
 import { MessageService } from '@theia/core';
 import { AssignmentsDataProvider } from './assignments-data-provider';
+import { AssignmentGenerator } from './assignments-generator';
+import { WorkspaceService } from '@theia/workspace/lib/browser';
+import URI from '@theia/core/lib/common/uri';
 
 @injectable()
 export class AssignmentsViewWidget extends TreeWidget {
@@ -21,7 +26,9 @@ export class AssignmentsViewWidget extends TreeWidget {
         @inject(TreeModel) readonly model: TreeModel,
         @inject(ContextMenuRenderer) contextMenuRenderer: ContextMenuRenderer,
         @inject(MessageService) private readonly messageService: MessageService,
-        // @inject(AssignmentsDataProvider) private readonly dataProvider: AssignmentsDataProvider,
+        @inject(WorkspaceService) private readonly workspaceService: WorkspaceService,
+        @inject(OpenerService) private readonly openerService: OpenerService,
+        @inject(AssignmentGenerator) private readonly assignmentGenerator: AssignmentGenerator,
     ) {
         super(props, model, contextMenuRenderer);
 
@@ -33,33 +40,18 @@ export class AssignmentsViewWidget extends TreeWidget {
 
         const dataProvider = new AssignmentsDataProvider();
 
-        // TODO: Think of a way not to do login here
-        // TODO: Clean up code
-        // TODO: Implement file generation
-        // TODO: Fix data model... !!!!!!! include info for generatin request for file copy
-        //          Before copying file, check if file exists!
-        //          Does the service handle it or do I have to???
+        dataProvider
+            .getCoursesData()
+            .then((directories: Directory[]) => {
+                if (directories === []) {
+                    this.messageService.info('No active courses found. If you think that this is an issue, contact your supervisor.');
+                }
 
-        dataProvider.login('hstudente', 'password')
-            .then(text => {
-                console.log("Login Response Text: " + text);
-                dataProvider
-                    .getCoursesData()
-                    .then((directories: Directory[]) => {
-                        if (directories === []) {
-                            this.messageService.info('No active courses found. If you think that this is an issue, contact your supervisor.')
-                        }
-
-                        this.model.root = this.makeRootNode(directories);
-                        this.update();
-                    })
-                    .catch(err => {
-                        this.messageService.info(`Failed to fetch any data`);
-                        this.messageService.log(err.toString());
-                    });
+                this.model.root = this.makeRootNode(directories);
+                this.update();
             })
             .catch(err => {
-                console.log(err);
+                this.messageService.info(`Failed to fetch any assignment data...`);
             });
 
         this.model.root = this.makeRootNode([]);
@@ -79,12 +71,34 @@ export class AssignmentsViewWidget extends TreeWidget {
 
     protected handleDblClickEvent(node: TreeNode | undefined, event: React.MouseEvent<HTMLElement>): void {
         if (node && AssignmentNode.is(node)) {
-            this.messageService.info(node.assignment.id);
+            this.assignmentDirectoryGeneration(node.assignment)
+                .catch(err => this.messageService.info(err));
             event.stopPropagation();
         } else {
             this.model.openNode(node);
             event.stopPropagation();
         }
+    }
+
+    private async assignmentDirectoryGeneration(assignment: Assignment) {
+        const directoryExists = await this.workspaceService.containsSome([assignment.path]);
+        const workspaceURI = this.workspaceService.workspace?.uri || '';
+        const assignmentDirectoryURI = `${workspaceURI}/${assignment.path}`;
+
+        if (!directoryExists) {
+            this.messageService.info(`Generating sources for '${assignment.path}'...`);
+            await this.assignmentGenerator.generateAssignmentSources(assignmentDirectoryURI, assignment)
+            this.messageService.info(`Sources for ${assignment.path} generated successfully!`);
+        }
+
+        const filesToOpen = assignment.files
+            .filter(file => file.show && !file.binary)
+            .map(file => {
+                const fileURI = new URI(`${assignmentDirectoryURI}/${file.filename}`);
+                return open(this.openerService, fileURI);
+            });
+
+        await Promise.all(filesToOpen);
     }
 
     protected isExpandable(node: TreeNode): node is ExpandableTreeNode {
