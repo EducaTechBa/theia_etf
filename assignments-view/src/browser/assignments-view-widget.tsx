@@ -36,7 +36,7 @@ export class AssignmentsViewWidget extends TreeWidget {
         this.title.label = AssignmentsViewWidget.LABEL;
         this.title.caption = AssignmentsViewWidget.LABEL;
         this.title.closable = true;
-        this.title.iconClass = 'fa fa-window-maximize';
+        this.title.iconClass = 'fa fa-code';
 
         const dataProvider = new AssignmentsDataProvider();
 
