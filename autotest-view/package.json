@@ -5,15 +5,15 @@
   ],
   "version": "0.0.0",
   "description": "Desct",
-  
   "author": "Rijad",
-  
   "files": [
     "lib",
     "src"
   ],
   "dependencies": {
-    "@theia/core": "latest"
+    "@theia/core": "latest",
+    "@types/jszip": "^3.4.1",
+    "jszip": "^3.5.0"
   },
   "devDependencies": {
     "rimraf": "latest",

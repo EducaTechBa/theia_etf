@@ -20,7 +20,7 @@ export class AutotestViewContribution extends AbstractViewContribution<AutotestV
 
     registerCommands(commands: CommandRegistry): void {
         commands.registerCommand(AutotestViewCommand, {
-            execute: () => super.openView({ activate: false, reveal: true })
+            execute: () => super.openView({ activate: true, reveal: true })
         });
     }
 
