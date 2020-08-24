@@ -5,6 +5,7 @@ import { MessageService } from '@theia/core';
 import { EditorManager } from '@theia/editor/lib/browser';
 import { FileSystem } from '@theia/filesystem/lib/common';
 import { Autotester } from './autotester';
+import URI from '@theia/core/lib/common/uri';
 
 @injectable()
 export class AutotestViewWidget extends ReactWidget {
@@ -40,25 +41,49 @@ export class AutotestViewWidget extends ReactWidget {
         </div>
     }
 
-    private handleRunTests() {
-        const editor = this.editorManager.currentEditor;
-        if (editor) {
-            const uri = editor.getResourceUri();
-            if (!uri) {
-                this.messageService.info("File not saved!");
-                return;
-            }
-            const autotestFileURI = `${uri.parent}/.autotest2`;
-            this.fileSystem.resolveContent(autotestFileURI)
-                .then(file => {
-                    const autotest = JSON.parse(file.content);
-                    this.messageService.info(`Autotest ID: ${autotest.id}`);
-                    this.autotester.setProgramFile("program id", "main.c", "");
-                })
-                .catch(err => console.log(err));
-        } else {
-            this.messageService.info("No file currently opened!");
+    // Disable test button while testing in progress???
+    private async handleRunTests() {
+        const currentFile = this.getCurrentEditorFile();
+        if (!currentFile) {
+            this.messageService.info("Please open a source file to test!");
+            return;
         }
+
+        // Kako da znam koji je file zapravo source file????
+        const sourceFilename = 'main.c';
+        const dir = currentFile.parent.toString();
+
+        const autotestContent = await this.loadFileContent(dir , '.autotest2');
+        const sourceContent = await this.loadFileContent(dir, sourceFilename);
+
+        const autotest = JSON.parse(autotestContent);
+        const taskID = await this.autotester.setTask(autotest);
+        console.log(`Task ID: ${taskID}`);
+        // Check if a program exists first, otherwise create a new one...
+        const programID = await this.autotester.setProgram(taskID);
+        console.log(`Program ID: ${programID}`);
+        await this.autotester.setProgramFile(programID, sourceFilename, sourceContent);
+        console.log("Source file is set...");
+    }
+
+    private getCurrentEditorFile(): URI | null {
+        const editor = this.editorManager.currentEditor;
+        if (!editor) {
+            return null;
+        }
+
+        const uri = editor.getResourceUri();
+        if (!uri) {
+            return null;
+        }
+
+        return uri;
+    }
+
+    private async loadFileContent(dir: string, filename: string): Promise<string> {
+        const uri = `${dir}/${filename}`;
+        const file = await this.fileSystem.resolveContent(uri);
+        return file.content;
     }
 
 }
