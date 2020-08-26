@@ -1,33 +1,8 @@
 import { injectable } from 'inversify';
 import * as JSZip from 'jszip';
-import { StatefulWidget } from '@theia/core/lib/browser';
-
-interface AutotesterState {
-    programIDs: any
-};
-
-namespace AutotesterState {
-    export function is(obj: object): obj is AutotesterState {
-        return !!obj && "programIDs" in obj;
-    }
-}
 
 @injectable()
-export class Autotester implements StatefulWidget {
-
-    private state: AutotesterState;
-
-    storeState(): object {
-        return this.state;
-    }
-
-    restoreState(oldState: object): void {
-        this.state = AutotesterState.is(oldState) ? oldState as AutotesterState : {
-            programIDs: {
-                '4093': '32777'
-            }
-        };
-    }
+export class Autotester {
 
     private makeURL(action: string, queryParams: string) {
         return `/autotester/server/push.php?action=${action}&${queryParams}`;
@@ -47,8 +22,6 @@ export class Autotester implements StatefulWidget {
     }
 
     public async setProgram(taskID: string): Promise<string> {
-        console.log(JSON.stringify(this.state));
-
         const program = { task: taskID, name: '' };
         const programQuery = encodeURIComponent(JSON.stringify(program));
         const url = this.makeURL('setProgram', `program=${programQuery}`);
@@ -61,13 +34,19 @@ export class Autotester implements StatefulWidget {
         return data.data;
     }
 
-    // TODO: Remove. This method will not be used...
-    public async getPrograms(taskID: string): Promise<any> {
-        const url = this.makeURL('listPrograms', `task=${taskID}`)
-        const res = await fetch(url);
-        const data = await res.json();
+    public async setProgramFiles(programID: string, files: AssignmentFile[]) {
+        const url = this.makeURL('setProgramFile', `id=${programID}`);
 
-        return data.data;
+        const zip = new JSZip();
+        files.forEach(file => zip.file(file.name, file.content));
+        const content = await zip.generateAsync({ type: 'blob' });
+
+        const formData = new FormData();
+        formData.append('program', content);
+        await fetch(url, {
+            method: 'POST',
+            body: formData
+        });
     }
 
     public async setProgramFile(programID: string, filename: string, filecontent: string) {
@@ -88,23 +67,15 @@ export class Autotester implements StatefulWidget {
     public async getResults(programID: string) {
         const url = this.makeURL('getResult', `id=${programID}`);
         const res = await fetch(url);
-        const data = await res.text();
+        const data = await res.json();
 
-        console.log(data);
-    }
-
-    public async writeAutotestResultsFile() {
-        // TODO: Implement
-    }
-
-    public async retest(programID: string) {
-        const url = this.makeURL('retest', `id=${programID}`);
-        const res = await fetch(url, {
-            method: 'POST'
-        });
-        const data = await res.text();
-
-        console.log(data);
+        return data.data;
     }
 
 }
+
+export interface AssignmentFile {
+    uri: string;
+    name: string;
+    content: string;
+} 

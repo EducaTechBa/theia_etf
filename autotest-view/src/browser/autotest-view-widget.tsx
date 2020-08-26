@@ -49,21 +49,40 @@ export class AutotestViewWidget extends ReactWidget {
             return;
         }
 
-        // Kako da znam koji je file zapravo source file????
-        const sourceFilename = 'main.c';
-        const dir = currentFile.parent.toString();
+        const dirURI = currentFile.parent.toString();
+        const dir = await this.fileSystem.getFileStat(dirURI);
+        if (!dir || !dir.isDirectory) {
+            return;
+        }
 
-        const autotestContent = await this.loadFileContent(dir , '.autotest2');
-        const sourceContent = await this.loadFileContent(dir, sourceFilename);
-
+        const autotestURI = `${dirURI}/.autotest2`;
+        const autotestContent = await (await this.fileSystem.resolveContent(autotestURI)).content;
         const autotest = JSON.parse(autotestContent);
+
         const taskID = await this.autotester.setTask(autotest);
         console.log(`Task ID: ${taskID}`);
-        // Check if a program exists first, otherwise create a new one...
+
         const programID = await this.autotester.setProgram(taskID);
         console.log(`Program ID: ${programID}`);
-        await this.autotester.setProgramFile(programID, sourceFilename, sourceContent);
-        console.log("Source file is set...");
+
+        const filesStats = dir.children ?? [];
+        const assignmentFiles = filesStats.map(file => ({
+            uri: file.uri,
+            name: new URI(file.uri).displayName
+        }));
+
+        const promises = assignmentFiles.map(file =>
+            this.fileSystem
+                .resolveContent(file.uri)
+                .then(({ content }) => ({
+                    ...file,
+                    content
+                }))
+        );
+
+        const files = await Promise.all(promises);
+        this.autotester.setProgramFiles(programID, files);
+        console.log("Source files are set...");
     }
 
     private getCurrentEditorFile(): URI | null {
@@ -80,10 +99,8 @@ export class AutotestViewWidget extends ReactWidget {
         return uri;
     }
 
-    private async loadFileContent(dir: string, filename: string): Promise<string> {
-        const uri = `${dir}/${filename}`;
-        const file = await this.fileSystem.resolveContent(uri);
-        return file.content;
+    public async writeAutotestResultsFile() {
+        // TODO: Implement
     }
-
+    
 }
