@@ -7,7 +7,6 @@
     "@theia/core": "latest",
     "@theia/debug": "latest",
     "@theia/editor": "latest",
-    "@theia/editor-preview": "latest",
     "@theia/file-search": "latest",
     "@theia/filesystem": "latest",
     "@theia/getting-started": "latest",
