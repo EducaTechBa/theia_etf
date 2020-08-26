@@ -1,0 +1,17 @@
+#widget-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-items: flex-start;
+    padding: 0px 16px;
+}
+
+.run-tests-button {
+    margin: 16px 0px !important;
+}
+
+.test-list {
+    list-style: none;
+    padding: 0px;
+    margin: 0px;
+}

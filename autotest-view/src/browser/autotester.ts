@@ -1,6 +1,21 @@
 import { injectable } from 'inversify';
 import * as JSZip from 'jszip';
 
+export interface AutotesterState {
+    programs: any 
+};
+
+export namespace AutotesterState {
+    export function is(obj: object): obj is AutotesterState {
+        return !!obj && "programs" in obj;
+    }
+}
+
+export interface Program {
+    id: string;
+    status: string;
+}
+
 @injectable()
 export class Autotester {
 
@@ -8,6 +23,7 @@ export class Autotester {
         return `/autotester/server/push.php?action=${action}&${queryParams}`;
     }
 
+    // Call getTask, not setTask?
     public async setTask(autotest: any): Promise<string> {
         const autotestQuery = encodeURIComponent(JSON.stringify(autotest));
         const url = this.makeURL('setTask', `task=${autotestQuery}`);
@@ -39,21 +55,6 @@ export class Autotester {
 
         const zip = new JSZip();
         files.forEach(file => zip.file(file.name, file.content));
-        const content = await zip.generateAsync({ type: 'blob' });
-
-        const formData = new FormData();
-        formData.append('program', content);
-        await fetch(url, {
-            method: 'POST',
-            body: formData
-        });
-    }
-
-    public async setProgramFile(programID: string, filename: string, filecontent: string) {
-        const url = this.makeURL('setProgramFile', `id=${programID}`);
-
-        const zip = new JSZip();
-        zip.file(filename, filecontent);
         const content = await zip.generateAsync({ type: 'blob' });
 
         const formData = new FormData();
