@@ -39,6 +39,7 @@ export interface TestResult {
     status: TestResultStatus;
 }
 
+// TODO: Map to messages of status...
 export enum TestResultStatus {
     TEST_SUCCESS = 1,
     TEST_SYMBOL_NOT_FOUND = 2,
@@ -91,10 +92,10 @@ const integerToProgramStatusMapping: Record<number, ProgramStatus> = {
     8: ProgramStatus.PROGRAM_REJECTED,
 }
 
+// TODO: Maybe do the same as above for the TestResultStatus
+
 @injectable()
 export class AutotestService {
-
-    // TODO: Add testing progress emitter???
 
     private readonly POLL_TIMEOUT_MS = 500;
     private readonly AUTOTEST_RESULTS_FILENAME = '.at_result';
@@ -251,7 +252,9 @@ export class AutotestService {
 
     private async writeAutotestResultsFile(dirURI: string, content: string): Promise<FileStat> {
         const uri = `${dirURI}/${this.AUTOTEST_RESULTS_FILENAME}`;
-        await this.fileSystem.delete(uri);
+        try {
+            await this.fileSystem.delete(uri);
+        } catch(_) {}
         return await this.fileSystem.createFile(uri, { content });
     }
 
