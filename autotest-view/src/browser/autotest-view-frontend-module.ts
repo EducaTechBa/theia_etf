@@ -5,12 +5,14 @@ import { bindViewContribution, FrontendApplicationContribution, WidgetFactory } 
 
 import '../../src/browser/style/index.css';
 import { Autotester } from './autotester';
+import { AutotestService } from './autotest-service';
 
 export default new ContainerModule(bind => {
     bindViewContribution(bind, AutotestViewContribution);
     bind(FrontendApplicationContribution).toService(AutotestViewContribution);
     bind(AutotestViewWidget).toSelf();
-    bind(Autotester).toSelf().inRequestScope();
+    bind(Autotester).toSelf().inSingletonScope();
+    bind(AutotestService).toSelf().inSingletonScope();
     bind(WidgetFactory).toDynamicValue(ctx => ({
         id: AutotestViewWidget.ID,
         createWidget: () => ctx.container.get<AutotestViewWidget>(AutotestViewWidget)
