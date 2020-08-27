@@ -1,20 +1,11 @@
 import { injectable } from 'inversify';
 import * as JSZip from 'jszip';
 
-export interface AutotesterState {
-    programs: any 
+export interface AssignmentFile {
+    uri: string;
+    name: string;
+    content: string;
 };
-
-export namespace AutotesterState {
-    export function is(obj: object): obj is AutotesterState {
-        return !!obj && "programs" in obj;
-    }
-}
-
-export interface Program {
-    id: string;
-    status: string;
-}
 
 @injectable()
 export class Autotester {
@@ -74,9 +65,3 @@ export class Autotester {
     }
 
 }
-
-export interface AssignmentFile {
-    uri: string;
-    name: string;
-    content: string;
-} 

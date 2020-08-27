@@ -3,9 +3,24 @@ import { injectable, postConstruct, inject } from 'inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core';
 import { EditorManager, EditorWidget } from '@theia/editor/lib/browser';
-import { FileSystem } from '@theia/filesystem/lib/common';
-import { Autotester, AutotesterState, Program } from './autotester';
+import { FileSystem, FileStat } from '@theia/filesystem/lib/common';
+import { Autotester } from './autotester';
 import URI from '@theia/core/lib/common/uri';
+
+interface AutotesterState {
+    programs: any
+};
+
+namespace AutotesterState {
+    export function is(obj: object): obj is AutotesterState {
+        return !!obj && "programs" in obj;
+    }
+}
+
+interface Program {
+    id: string;
+    status: number;
+}
 
 interface SimpleTestResult {
     id: string;
@@ -23,6 +38,8 @@ export class AutotestViewWidget extends ReactWidget {
     private state: AutotesterState = { programs: {} };
     private currentAutotestResults: SimpleTestResult[] = [];
     private currentProgramMessage: string = "";
+
+    private readonly POLL_TIMEOUT_MS = 500;
 
     @inject(MessageService)
     protected readonly messageService!: MessageService;
@@ -61,27 +78,31 @@ export class AutotestViewWidget extends ReactWidget {
         this.setCurrentProgramDirectoryURI(uri);
 
         const autotestFile = await this.loadAutotestFile(this.currentProgramDirectoryURI ?? '');
-        if(!autotestFile) {
+        if (!autotestFile) {
             this.currentAutotestResults = [];
             this.setCurrentProgramMessage("No autotests defined.");
             return;
         }
 
         try {
-            const content = await this.loadAutotestResultsFile(this.currentProgramDirectoryURI || '')
+            const content = await this.loadAutotestResultsFile(this.currentProgramDirectoryURI ?? '')
             const results = JSON.parse(content);
-            const testResults = Object.entries(results.test_results);
-            this.currentAutotestResults = testResults.map(([id, testResult]) => {
-                const { success, status } = testResult as SimpleTestResult;
-                return {
-                    id, success, status,
-                };
-            });
+            this.setSimpleTestResultsFromAutotestResult(results);
             this.clearCurrentProgramMessage();
         } catch (err) {
             this.currentAutotestResults = [];
             this.setCurrentProgramMessage(err);
         }
+    }
+
+    private setSimpleTestResultsFromAutotestResult(results: any) {
+        const testResults = Object.entries(results.test_results);
+        this.currentAutotestResults = testResults.map(([id, testResult]) => {
+            const { success, status } = testResult as SimpleTestResult;
+            return {
+                id, success, status,
+            };
+        });
     }
 
     private setCurrentProgramDirectoryURI(uri: string | undefined) {
@@ -101,9 +122,9 @@ export class AutotestViewWidget extends ReactWidget {
     }
 
     protected render(): React.ReactNode {
-        // TODO: When the current editor is switched,
-        //       show the status of the assignment in focus???
-        //       Load the results from .at_results file...
+        // TODO: When tests are running, show how many are completed...
+        //       When the tests are finished, write the .at_results file nad this.update()
+        //       If the program is waiting in queue, display how many are in front...
         return <div id='widget-container'>
             <button
                 className="theia-button run-tests-button"
@@ -135,17 +156,6 @@ export class AutotestViewWidget extends ReactWidget {
             });
     }
 
-    // private delay(ms: number) {
-    //     return new Promise(resolve => setTimeout(resolve, ms));
-    // }
-
-    // private async getResults(programID: string) {
-    //     const result = await this.autotester.getResults(programID);
-    //     // Update program.state
-    //     await this.delay(500);
-    //     // Pozovi opet getResutls ako nije gotovo testiranje...
-    // }
-
     private async runTests() {
         this.clearCurrentProgramMessage();
 
@@ -170,9 +180,10 @@ export class AutotestViewWidget extends ReactWidget {
         let program = this.getProgram(dirURI);
         if (!program) {
             program = await this.createProgram(taskID);
+            this.state.programs[dirURI] = program;
         }
-        const programID = program.id;
-        console.log(`Program ID: ${programID}`);
+
+        console.log(`Program ID: ${program.id}`);
 
         const dir = await this.fileSystem.getFileStat(dirURI);
         if (!dir || !dir.isDirectory) {
@@ -194,22 +205,83 @@ export class AutotestViewWidget extends ReactWidget {
                 }))
         );
 
+        // TODO: Fix setting progrma files. AGAIN IDIOT!!!!!!!!!!!!!!
+
         const files = await Promise.all(promises);
-        this.autotester.setProgramFiles(programID, files);
+        await this.autotester.setProgramFiles(program.id, files);
         console.log("Source files are set...");
+        this.currentAutotestResults = [];
         this.setCurrentProgramMessage("Testing...");
+        this.getResults(program.id);
     }
 
     private async createProgram(taskID: string): Promise<Program> {
         const id = await this.autotester.setProgram(taskID);
         return {
             id,
-            status: 'queue'
+            status: 1
         };
     }
 
     private getProgram(dirURI: string): Program {
         return this.state.programs[dirURI];
+    }
+
+    private delay(ms: number) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    private async getResults(dirURI: string) {
+        const program = this.getProgram(dirURI);
+        const result = await this.autotester.getResults(program.id);
+        const programStatus = result.status;
+
+        // PROGRAM_AWAITING_RESULTS
+        if (programStatus === 1) {
+            await this.delay(this.POLL_TIMEOUT_MS);
+            this.getResults(program.id);
+            return;
+        }
+
+        // PROGRAM COMPILE ERROR
+        if (programStatus === 3) {
+            // Show error messages...
+            this.currentAutotestResults = [];
+            this.setCurrentProgramMessage("Program could not compile.");
+            return;
+        }
+
+        // PROGRAM_FINISHED_TESTING
+        if (programStatus === 4) {
+            await this.writeAutotestResultsFile(dirURI, JSON.stringify(result, null, 4));
+            this.setSimpleTestResultsFromAutotestResult(result);
+            this.setCurrentProgramMessage("Finished testing.");
+            return;
+        }
+
+        // PROGRAM_NO_SORUCES_FOUND
+        if (programStatus === 6) {
+            this.currentAutotestResults = [];
+            this.setCurrentProgramMessage("No program sources found.");
+            return;
+        }
+
+        // PROGRAM_CURRENTLY_TESTING
+        if (programStatus === 7) {
+            // Display progress...
+            this.currentAutotestResults = [];
+            this.setCurrentProgramMessage("Testing...");
+            return;
+        }
+
+        // PROGRAM_REJECTED
+        if (programStatus === 8) {
+            // Display message that the program needs to be retested...
+            this.currentAutotestResults = [];
+            this.setCurrentProgramMessage("Could not test program. Please try again...");
+            return;
+        }
+
     }
 
     private async loadAutotestFile(dirURI: string): Promise<string | undefined> {
@@ -223,14 +295,13 @@ export class AutotestViewWidget extends ReactWidget {
         }
     }
 
-    public async writeAutotestResultsFile() {
-        // TODO: Implement
+    private async writeAutotestResultsFile(dirURI: string, content: string): Promise<FileStat> {
+        return await this.fileSystem.createFile(`${dirURI}/.at_result`, { content });
     }
 
-    public async loadAutotestResultsFile(dirURI: string): Promise<string> {
-        // TODO: Implement
+    private async loadAutotestResultsFile(dirURI: string): Promise<string> {
         try {
-            const file = await this.fileSystem.resolveContent(`${dirURI}/.at_results`);
+            const file = await this.fileSystem.resolveContent(`${dirURI}/.at_result`);
             return file.content;
         } catch (_) {
             throw "No autotest results.";
