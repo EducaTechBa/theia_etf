@@ -2,6 +2,7 @@ import { injectable, inject } from "inversify";
 import { Emitter } from '@theia/core/lib/common/event';
 import { Autotester } from './autotester';
 import { FileSystem, FileStat } from '@theia/filesystem/lib/common';
+import { WorkspaceService } from '@theia/workspace/lib/browser';
 import URI from '@theia/core/lib/common/uri';
 
 interface AutotesterState {
@@ -87,6 +88,7 @@ export class AutotestService {
 
     private readonly POLL_TIMEOUT_MS = 500;
     private readonly AUTOTEST_RESULTS_FILENAME = '.at_result';
+    private readonly AUTOTEST_FILENAME = '.autotest2';
 
     private state: AutotesterState = { programs: {} };
 
@@ -99,6 +101,7 @@ export class AutotestService {
     constructor(
         @inject(Autotester) private readonly autotester: Autotester,
         @inject(FileSystem) private readonly fileSystem: FileSystem,
+        @inject(WorkspaceService) private readonly workspaceService: WorkspaceService,
     ) { }
 
     public async runTests(dirURI: string): Promise<AutotestRunInfo> {
@@ -214,7 +217,7 @@ export class AutotestService {
 
     private async loadAutotestFile(dirURI: string): Promise<string | undefined> {
         try {
-            const autotestURI = `${dirURI}/.autotest2`;
+            const autotestURI = `${dirURI}/${this.AUTOTEST_FILENAME}`;
             const autotestFile = await this.fileSystem.resolveContent(autotestURI);
             const autotestContent = autotestFile.content;
             return autotestContent;
@@ -229,9 +232,10 @@ export class AutotestService {
     }
 
     public async hasAutotestsDefined(dirURI: string): Promise<boolean> {
-        const uri = `${dirURI}/${this.AUTOTEST_RESULTS_FILENAME}`;
-        const fileStat = await this.fileSystem.getFileStat(uri);
-        return fileStat !== undefined;
+        const uri = `${dirURI}/${this.AUTOTEST_FILENAME}`;
+        const workspaceUri = this.workspaceService.workspace?.uri;
+        const trimmed = uri.slice(workspaceUri?.length);
+        return await this.workspaceService.containsSome([trimmed]);
     }
 
     public async loadAutotestResultsFile(dirURI: string): Promise<string> {
