@@ -15,24 +15,25 @@ namespace AutotesterState {
     }
 }
 
-interface Program {
+export interface Program {
     id: string;
     status: ProgramStatus;
+    totalTests: number;
     testResults: TestResult[];
 }
 
-enum ProgramStatus {
-    PROGRAM_AWAITING_TESTS = 1,
-    PROGRAM_PLAGIARIZED = 2,
-    PROGRAM_COMPILE_ERROR = 3,
-    PROGRAM_FINISHED_TESTING = 4,
-    PROGRAM_GRADED = 5,
-    PROGRAM_NO_SOURCES_FOUND = 6,
-    PROGRAM_CURRENTLY_TESTING = 7,
-    PROGRAM_REJECTED = 8,
+export enum ProgramStatus {
+    PROGRAM_AWAITING_TESTS = "Waiting in queue...",
+    PROGRAM_PLAGIARIZED = "Program is plagiarized!",
+    PROGRAM_COMPILE_ERROR = "Program could not be compiled!",
+    PROGRAM_FINISHED_TESTING = "Done testing!",
+    PROGRAM_GRADED = "Program graded!",
+    PROGRAM_NO_SOURCES_FOUND = "No sources to be tested found...",
+    PROGRAM_CURRENTLY_TESTING = "Running tests...",
+    PROGRAM_REJECTED = "Could not test program. Please try again...",
 }
 
-interface TestResult {
+export interface TestResult {
     id: number;
     success: boolean;
     status: TestResultStatus;
@@ -66,7 +67,16 @@ export enum AutotestRunStatus {
 
 export interface AutotestEvent {
     program: Program,
-    success: boolean,
+}
+
+export interface AutotestUpdateEvent extends AutotestEvent {
+    inQueue: number,
+    completedTests: number,
+    isBeingTested: boolean,
+}
+
+export interface AutotestFinishEvent extends AutotestEvent {
+    success: boolean
 }
 
 // TODO: Find a way to avoid this -_-
@@ -92,11 +102,11 @@ export class AutotestService {
 
     private state: AutotesterState = { programs: {} };
 
-    private readonly onTestsStartedEmitter = new Emitter<AutotestEvent>();
-    readonly onTestsStarted = this.onTestsStartedEmitter.event;
-
-    private readonly onTestsFinishedEmitter = new Emitter<AutotestEvent>();
+    private readonly onTestsFinishedEmitter = new Emitter<AutotestFinishEvent>();
     readonly onTestsFinished = this.onTestsFinishedEmitter.event;
+
+    private readonly onTestsUpdateEmitter = new Emitter<AutotestUpdateEvent>();
+    readonly onTestsUpdate = this.onTestsUpdateEmitter.event;
 
     constructor(
         @inject(Autotester) private readonly autotester: Autotester,
@@ -119,7 +129,7 @@ export class AutotestService {
 
         let program = this.getProgram(dirURI);
         if (!program) {
-            program = await this.createProgram(taskID);
+            program = await this.createProgram(taskID, autotest.tests.length);
             this.state.programs[dirURI] = program;
         }
 
@@ -154,12 +164,7 @@ export class AutotestService {
         await this.autotester.setProgramFiles(program.id, files);
         console.log("Source files are set...");
 
-        this.onTestsStartedEmitter.fire({
-            program,
-            success: false
-        });
-
-        this.getResults(program.id);
+        this.getResults(dirURI);
 
         return {
             success: true,
@@ -167,42 +172,60 @@ export class AutotestService {
         };
     }
 
-    private async createProgram(taskID: string): Promise<Program> {
+    private async createProgram(taskID: string, totalTests: number): Promise<Program> {
         const id = await this.autotester.setProgram(taskID);
         return {
             id,
             status: ProgramStatus.PROGRAM_AWAITING_TESTS,
-            testResults: []
+            testResults: [],
+            totalTests,
         };
     }
 
-    private getProgram(dirURI: string): Program {
+    private getProgram(dirURI: string): Program | undefined {
         return this.state.programs[dirURI];
     }
 
     private async getResults(dirURI: string) {
         const program = this.getProgram(dirURI);
+
+        if (!program) {
+            console.log('No program found...');
+            return;
+        }
+
         const result = await this.autotester.getResults(program.id);
         program.status = this.integerToProgramStatus(result.status);
+        const inQueue = result.queue_items ?? 0;
+        const completedTests = Object.entries(result.test_results).length;
 
         // If the testing is not completed, getResults again...
-        if (program.status === ProgramStatus.PROGRAM_AWAITING_TESTS) {
+        if (program.status === ProgramStatus.PROGRAM_AWAITING_TESTS
+            || program.status === ProgramStatus.PROGRAM_CURRENTLY_TESTING) {
+            this.onTestsUpdateEmitter.fire({
+                program,
+                inQueue,
+                isBeingTested: program.status === ProgramStatus.PROGRAM_CURRENTLY_TESTING,
+                completedTests,
+            });
             await this.delay(this.POLL_TIMEOUT_MS);
             this.getResults(dirURI);
             return;
         }
 
-        const success = program.status in [
+        const success = !(program.status in [
             ProgramStatus.PROGRAM_COMPILE_ERROR,
             ProgramStatus.PROGRAM_NO_SOURCES_FOUND,
             ProgramStatus.PROGRAM_REJECTED
-        ];
+        ]);
 
         if (success) {
             await this.writeAutotestResultsFile(dirURI, JSON.stringify(result, null, 4));
         }
 
         // TODO: Populate program.taskResults
+
+        console.log(JSON.stringify(program));
 
         this.onTestsFinishedEmitter.fire({ program, success });
     }
@@ -228,6 +251,7 @@ export class AutotestService {
 
     private async writeAutotestResultsFile(dirURI: string, content: string): Promise<FileStat> {
         const uri = `${dirURI}/${this.AUTOTEST_RESULTS_FILENAME}`;
+        await this.fileSystem.delete(uri);
         return await this.fileSystem.createFile(uri, { content });
     }
 

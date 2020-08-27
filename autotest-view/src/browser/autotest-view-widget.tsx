@@ -4,7 +4,7 @@ import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core';
 import { EditorManager, EditorWidget } from '@theia/editor/lib/browser';
 import { FileSystem } from '@theia/filesystem/lib/common';
-import { AutotestService, AutotestRunStatus } from './autotest-service';
+import { AutotestService, AutotestRunStatus, ProgramStatus } from './autotest-service';
 
 interface SimpleTestResult {
     id: string;
@@ -21,6 +21,7 @@ export class AutotestViewWidget extends ReactWidget {
     private currentProgramDirectoryURI: string | undefined = undefined;
     private currentAutotestResults: SimpleTestResult[] = [];
     private currentProgramMessage: string = "";
+    private currentProgressMessage: string = "";
 
     @inject(MessageService)
     protected readonly messageService!: MessageService;
@@ -43,12 +44,29 @@ export class AutotestViewWidget extends ReactWidget {
         this.title.iconClass = 'fa fa-check-circle-o';
         this.update();
 
-        this.autotestService.onTestsStarted(autotestEvent => {
-            this.setCurrentProgramMessage("Running tests...");
+        this.autotestService.onTestsUpdate(autotestEvent => {
+            const { completedTests, program, inQueue, isBeingTested } = autotestEvent;
+            const statusMessage = program.status.toString();
+            this.setCurrentProgramMessage(statusMessage);
+            const completionMessage = `Completed ${completedTests} out of ${program.totalTests} tests...`;
+            const queueMessage = `${inQueue} programs awaiting execution...`;
+            this.setCurrentProgressMessage(isBeingTested ? completionMessage : queueMessage);
         });
 
         this.autotestService.onTestsFinished(autotestEvent => {
-            this.setCurrentProgramMessage("Test finished...");
+            const statusMessage = autotestEvent.program.status.toString();
+            this.setCurrentProgramMessage(statusMessage);
+            if (autotestEvent.program.status === ProgramStatus.PROGRAM_FINISHED_TESTING) {
+                this.autotestService.loadAutotestResultsFile(this.currentProgramDirectoryURI ?? '')
+                    .then(content => {
+                        const results = JSON.parse(content);
+                        this.setSimpleTestResultsFromAutotestResult(results);
+                        this.clearCurrentProgressMessage();
+                    })
+                    .catch(err => {
+                        this.setCurrentProgressMessage("Could not load results...");
+                    });
+            }
         });
 
         this.editorManager.onCreated(editorWidget => this.handleEditorSwitch(editorWidget));
@@ -110,6 +128,16 @@ export class AutotestViewWidget extends ReactWidget {
         this.update();
     }
 
+    private setCurrentProgressMessage(message: string | undefined) {
+        this.currentProgressMessage = message ?? '';
+        this.update();
+    }
+
+    private clearCurrentProgressMessage() {
+        this.currentProgressMessage = '';
+        this.update();
+    }
+
     protected render(): React.ReactNode {
         // TODO: When tests are running, show how many are completed...
         //       When the tests are finished, write the .at_results file nad this.update()
@@ -122,6 +150,7 @@ export class AutotestViewWidget extends ReactWidget {
                 Run tests
             </button>
             <span>{this.currentProgramMessage}</span>
+            <span>{this.currentProgressMessage}</span>
             <ul className="test-list">
                 {this.currentAutotestResults.map(result => this.renderTestResultItem(result))}
             </ul>
@@ -144,10 +173,11 @@ export class AutotestViewWidget extends ReactWidget {
         }
 
         try {
+            this.currentAutotestResults = [];
             const runInfo = await this.autotestService.runTests(this.currentProgramDirectoryURI)
             if (!runInfo.success) {
                 let message = "";
-                if(runInfo.status === AutotestRunStatus.ERROR_OPENING_DIRECTORY) {
+                if (runInfo.status === AutotestRunStatus.ERROR_OPENING_DIRECTORY) {
                     message = "Could not open directory.";
                 } else if (runInfo.status === AutotestRunStatus.NO_AUTOTESTS_DEFINED) {
                     message = "No autotests defined.";
