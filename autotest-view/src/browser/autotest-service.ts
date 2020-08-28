@@ -6,7 +6,7 @@ import { WorkspaceService } from '@theia/workspace/lib/browser';
 import URI from '@theia/core/lib/common/uri';
 
 interface AutotesterState {
-    programs: Record<string, Program>
+    programs: Record<string, Program | undefined>
 }
 
 namespace AutotesterState {
@@ -17,9 +17,26 @@ namespace AutotesterState {
 
 export interface Program {
     id: string;
+    uri: string;
     status: ProgramStatus;
     totalTests: number;
+    result?: Result;
+}
+
+// TODO: Move Program[status | totalTests] to Result
+//       Move Result[isWaiting | isBeingTested | inQueue | completedTests] to TestingProgress
+export interface Result {
+    completedTests: number;
+    isBeingTested: boolean;
+    isWaiting: boolean;
+    inQueue: number;
     testResults: TestResult[];
+}
+
+export interface TestResult {
+    id: number;
+    success: boolean;
+    status: TestResultStatus;
 }
 
 export enum ProgramStatus {
@@ -33,26 +50,19 @@ export enum ProgramStatus {
     PROGRAM_REJECTED = "Could not test program. Please try again...",
 }
 
-export interface TestResult {
-    id: number;
-    success: boolean;
-    status: TestResultStatus;
-}
-
-// TODO: Map to messages of status...
 export enum TestResultStatus {
-    TEST_SUCCESS = 1,
-    TEST_SYMBOL_NOT_FOUND = 2,
-    TEST_COMPILE_FAILED = 3,
-    TEST_EXECUTION_TIMEOUT = 4,
-    TEST_EXECUTION_CRASH = 5,
-    TEST_WRONG_OUTPUT = 6,
-    TEST_PROFILER_ERROR = 7,
-    TEST_OUTPUT_NOT_FOUND = 8,
-    TEST_UNEXPECTED_EXCEPTION = 9,
-    TEST_INTERNAL_ERROR = 10,
-    TEST_UNZIP_FAILED = 11,
-    TEST_TOOL_FAILED = 12,
+    TEST_SUCCESS = "Success!",
+    TEST_SYMBOL_NOT_FOUND = "Symbol not found",
+    TEST_COMPILE_FAILED = "Could not compile program",
+    TEST_EXECUTION_TIMEOUT = "Program took too long to execute",
+    TEST_EXECUTION_CRASH = "Program crashed",
+    TEST_WRONG_OUTPUT = "Wrong output",
+    TEST_PROFILER_ERROR = "Profiler error",
+    TEST_OUTPUT_NOT_FOUND = "Output not found",
+    TEST_UNEXPECTED_EXCEPTION = "Unexpected exception",
+    TEST_INTERNAL_ERROR = "Internal server error",
+    TEST_UNZIP_FAILED = "Unzip failed",
+    TEST_TOOL_FAILED = "Execution tool failed",
 }
 
 export interface AutotestRunInfo {
@@ -70,16 +80,6 @@ export interface AutotestEvent {
     program: Program,
 }
 
-export interface AutotestUpdateEvent extends AutotestEvent {
-    inQueue: number,
-    completedTests: number,
-    isBeingTested: boolean,
-}
-
-export interface AutotestFinishEvent extends AutotestEvent {
-    success: boolean
-}
-
 // TODO: Find a way to avoid this -_-
 const integerToProgramStatusMapping: Record<number, ProgramStatus> = {
     1: ProgramStatus.PROGRAM_AWAITING_TESTS,
@@ -92,7 +92,21 @@ const integerToProgramStatusMapping: Record<number, ProgramStatus> = {
     8: ProgramStatus.PROGRAM_REJECTED,
 }
 
-// TODO: Maybe do the same as above for the TestResultStatus
+// TODO: Find a way to avoid this -_-
+const integerToTestResultStatusMapping: Record<number, TestResultStatus> = {
+    1: TestResultStatus.TEST_SUCCESS,
+    2: TestResultStatus.TEST_SYMBOL_NOT_FOUND,
+    3: TestResultStatus.TEST_COMPILE_FAILED,
+    4: TestResultStatus.TEST_EXECUTION_TIMEOUT,
+    5: TestResultStatus.TEST_EXECUTION_CRASH,
+    6: TestResultStatus.TEST_WRONG_OUTPUT,
+    7: TestResultStatus.TEST_PROFILER_ERROR,
+    8: TestResultStatus.TEST_OUTPUT_NOT_FOUND,
+    9: TestResultStatus.TEST_UNEXPECTED_EXCEPTION,
+    10: TestResultStatus.TEST_INTERNAL_ERROR,
+    11: TestResultStatus.TEST_UNZIP_FAILED,
+    12: TestResultStatus.TEST_TOOL_FAILED,
+}
 
 @injectable()
 export class AutotestService {
@@ -103,10 +117,10 @@ export class AutotestService {
 
     private state: AutotesterState = { programs: {} };
 
-    private readonly onTestsFinishedEmitter = new Emitter<AutotestFinishEvent>();
+    private readonly onTestsFinishedEmitter = new Emitter<AutotestEvent>();
     readonly onTestsFinished = this.onTestsFinishedEmitter.event;
 
-    private readonly onTestsUpdateEmitter = new Emitter<AutotestUpdateEvent>();
+    private readonly onTestsUpdateEmitter = new Emitter<AutotestEvent>();
     readonly onTestsUpdate = this.onTestsUpdateEmitter.event;
 
     constructor(
@@ -116,6 +130,13 @@ export class AutotestService {
     ) { }
 
     public async runTests(dirURI: string): Promise<AutotestRunInfo> {
+        if (this.isBeingTested(dirURI)) {
+            return {
+                success: false,
+                status: AutotestRunStatus.RUNNING
+            };
+        }
+
         const autotestContent = await this.loadAutotestFile(dirURI);
         if (!autotestContent) {
             return {
@@ -130,7 +151,7 @@ export class AutotestService {
 
         let program = this.getProgram(dirURI);
         if (!program) {
-            program = await this.createProgram(taskID, autotest.tests.length);
+            program = await this.createProgram(taskID, autotest.tests.length, dirURI);
             this.state.programs[dirURI] = program;
         }
 
@@ -173,18 +194,25 @@ export class AutotestService {
         };
     }
 
-    private async createProgram(taskID: string, totalTests: number): Promise<Program> {
+    private async createProgram(taskID: string, totalTests: number, uri: string): Promise<Program> {
         const id = await this.autotester.setProgram(taskID);
         return {
             id,
             status: ProgramStatus.PROGRAM_AWAITING_TESTS,
-            testResults: [],
             totalTests,
+            uri
         };
     }
 
-    private getProgram(dirURI: string): Program | undefined {
+    public getProgram(dirURI: string): Program | undefined {
         return this.state.programs[dirURI];
+    }
+
+    private clearProgramResults(dirURI: string) {
+        const program = this.state.programs[dirURI];
+        if (program !== undefined) {
+            program.result = undefined;
+        }
     }
 
     private async getResults(dirURI: string) {
@@ -195,40 +223,34 @@ export class AutotestService {
             return;
         }
 
-        const result = await this.autotester.getResults(program.id);
-        program.status = this.integerToProgramStatus(result.status);
-        const inQueue = result.queue_items ?? 0;
-        const completedTests = Object.entries(result.test_results).length;
+        const responseResult = await this.autotester.getResults(program.id);
+        program.status = this.integerToProgramStatus(responseResult.status);
+
+        const result: Result = {
+            inQueue: responseResult.queue_items ?? 0,
+            isWaiting: program.status === ProgramStatus.PROGRAM_AWAITING_TESTS,
+            isBeingTested: program.status === ProgramStatus.PROGRAM_CURRENTLY_TESTING,
+            completedTests: Object.entries(responseResult.test_results).length,
+            testResults: [],
+        };
+
+        program.result = result;
 
         // If the testing is not completed, getResults again...
         if (program.status === ProgramStatus.PROGRAM_AWAITING_TESTS
             || program.status === ProgramStatus.PROGRAM_CURRENTLY_TESTING) {
-            this.onTestsUpdateEmitter.fire({
-                program,
-                inQueue,
-                isBeingTested: program.status === ProgramStatus.PROGRAM_CURRENTLY_TESTING,
-                completedTests,
-            });
+            this.onTestsUpdateEmitter.fire({ program });
             await this.delay(this.POLL_TIMEOUT_MS);
             this.getResults(dirURI);
             return;
         }
 
-        const success = !(program.status in [
-            ProgramStatus.PROGRAM_COMPILE_ERROR,
-            ProgramStatus.PROGRAM_NO_SOURCES_FOUND,
-            ProgramStatus.PROGRAM_REJECTED
-        ]);
-
-        if (success) {
-            await this.writeAutotestResultsFile(dirURI, JSON.stringify(result, null, 4));
-        }
-
         // TODO: Populate program.taskResults
 
-        console.log(JSON.stringify(program));
+        await this.writeAutotestResultsFile(dirURI, JSON.stringify(responseResult, null, 4));
+        this.clearProgramResults(dirURI);
 
-        this.onTestsFinishedEmitter.fire({ program, success });
+        this.onTestsFinishedEmitter.fire({ program });
     }
 
     private integerToProgramStatus(status: number): ProgramStatus {
@@ -254,7 +276,7 @@ export class AutotestService {
         const uri = `${dirURI}/${this.AUTOTEST_RESULTS_FILENAME}`;
         try {
             await this.fileSystem.delete(uri);
-        } catch(_) {}
+        } catch (_) { }
         return await this.fileSystem.createFile(uri, { content });
     }
 
@@ -265,14 +287,61 @@ export class AutotestService {
         return await this.workspaceService.containsSome([trimmed]);
     }
 
-    public async loadAutotestResultsFile(dirURI: string): Promise<string> {
+    public async loadAutotestResultsFile(dirURI: string): Promise<string | undefined> {
         try {
             const uri = `${dirURI}/${this.AUTOTEST_RESULTS_FILENAME}`;
             const file = await this.fileSystem.resolveContent(uri);
             return file.content;
         } catch (_) {
-            throw "No autotest results.";
+            return undefined;
         }
+    }
+
+    public async getProgramFromAutotestResultFile(dirURI: string): Promise<Program | undefined> {
+        const content = await this.loadAutotestResultsFile(dirURI);
+        if (content === undefined) {
+            return undefined;
+        }
+
+        const data = JSON.parse(content)
+        let testResults: TestResult[] = [];
+        if (data.test_results) {
+            const testResultObjects = Object.entries(data.test_results);
+            testResults = testResultObjects.map(([key, value]) => {
+                const result = value as any;
+                const id = Number(key);
+                const success = result.success as boolean;
+                const status = this.integerToTestResultStatus(result.status);
+                return { id, success, status };
+            });
+        }
+
+        const result: Result = {
+            isBeingTested: false,
+            isWaiting: false,
+            inQueue: 0,
+            completedTests: 0,
+            testResults
+        };
+
+        const program: Program = {
+            id: '',
+            totalTests: 0,
+            uri: dirURI,
+            status: this.integerToProgramStatus(data.status),
+            result
+        };
+
+        return program;
+    }
+
+    private integerToTestResultStatus(status: number): TestResultStatus {
+        return integerToTestResultStatusMapping[status];
+    }
+
+    public isBeingTested(dirURI: string): boolean {
+        const program = this.state.programs[dirURI];
+        return program !== undefined && program.result !== undefined;
     }
 
 }

@@ -4,26 +4,17 @@ import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core';
 import { EditorManager, EditorWidget } from '@theia/editor/lib/browser';
 import { FileSystem } from '@theia/filesystem/lib/common';
-import { AutotestService, AutotestRunStatus, ProgramStatus } from './autotest-service';
-
-// TODO: Replace status type number with TestResultStatus!!!
-interface SimpleTestResult {
-    id: string;
-    success: boolean;
-    status: number;
-};
+import { AutotestService, AutotestRunStatus, Program, TestResult } from './autotest-service';
 
 interface AutotestWidgetState {
     programDirectoryURI: string | undefined;
-    autotestResults: SimpleTestResult[];
+    autotestResults: TestResult[];
     statusMessage: string;
     progressMessage: string;
 }
 
 @injectable()
 export class AutotestViewWidget extends ReactWidget {
-
-    // TODO: Check all cases of setStatus...
 
     static readonly ID = 'autotest-view:widget';
     static readonly LABEL = 'Autotest';
@@ -57,39 +48,16 @@ export class AutotestViewWidget extends ReactWidget {
         this.update();
 
         this.autotestService.onTestsUpdate(autotestEvent => {
-            const { completedTests, program, inQueue, isBeingTested } = autotestEvent;
-            const statusMessage = program.status.toString();
-            const completionMessage = `Completed ${completedTests} out of ${program.totalTests} tests...`;
-            const queueMessage = `${inQueue} programs awaiting execution...`;
-
-            this.setState(state => {
-                state.statusMessage = statusMessage;
-                state.progressMessage = isBeingTested ? completionMessage : queueMessage;
-            });
+            const program = autotestEvent.program;
+            this.setStateProcessing(program);
         });
 
         this.autotestService.onTestsFinished(autotestEvent => {
-            const statusMessage = autotestEvent.program.status.toString();
-            this.setState(state => {
-                state.statusMessage = statusMessage;
-            });
-
-            if (autotestEvent.program.status === ProgramStatus.PROGRAM_FINISHED_TESTING) {
-                this.autotestService.loadAutotestResultsFile(this.state.programDirectoryURI ?? '')
-                    .then(content => {
-                        const results = JSON.parse(content);
-                        const simpleResults = this.getSimpleTestResultsFromAutotestResult(results);
-                        this.setState(state => {
-                            state.autotestResults = simpleResults;
-                            state.progressMessage = '';
-                        })
-                    })
-                    .catch(err => {
-                        this.setState(state => {
-                            state.progressMessage = "Could not load results...";
-                        });
-                    });
+            const program = autotestEvent.program;
+            if (program.uri !== this.state.programDirectoryURI) {
+                return;
             }
+            this.setStateFinished(this.state.programDirectoryURI);
         });
 
         this.editorManager.onCreated(editorWidget => this.handleEditorSwitch(editorWidget));
@@ -101,12 +69,50 @@ export class AutotestViewWidget extends ReactWidget {
         this.update();
     }
 
+    private async setStateProcessing(program: Program) {
+        if (program.uri !== this.state.programDirectoryURI || program.result === undefined) {
+            return;
+        }
+
+        const { completedTests, inQueue, isBeingTested } = program.result;
+        const statusMessage = program.status.toString();
+        const completionMessage = `Completed ${completedTests} out of ${program.totalTests} tests...`;
+        const queueMessage = `${inQueue} programs awaiting execution...`;
+
+        this.setState(state => {
+            state.statusMessage = statusMessage;
+            state.progressMessage = isBeingTested ? completionMessage : queueMessage;
+            state.autotestResults = [];
+        });
+    }
+
+    private async setStateFinished(dirURI: string) {
+        const program = await this.autotestService.getProgramFromAutotestResultFile(dirURI);
+
+        if (program === undefined || program.result === undefined) {
+            this.setState(state => {
+                state.autotestResults = [];
+                state.statusMessage = 'This program has not been tested before.';
+                state.progressMessage = '';
+            });
+            return;
+        }
+
+        this.setState(state => {
+            state.statusMessage = program.status.toString();
+            state.progressMessage = '';
+            state.autotestResults = program.result?.testResults ?? [];
+        });
+    }
+
     private async handleEditorSwitch(editorWidget: EditorWidget | undefined) {
         if (!editorWidget) {
             return;
         }
+
         const uri = editorWidget.getResourceUri()?.parent.toString();
-        if (this.state.programDirectoryURI === uri) {
+
+        if (uri === undefined || this.state.programDirectoryURI === uri ) {
             return;
         }
 
@@ -114,39 +120,32 @@ export class AutotestViewWidget extends ReactWidget {
             state.programDirectoryURI = uri;
         });
 
-        const hasAutotests = await this.autotestService.hasAutotestsDefined(this.state.programDirectoryURI ?? '');
+        if(this.state.programDirectoryURI === undefined) {
+            return;
+        }
+
+        if (this.autotestService.isBeingTested(this.state.programDirectoryURI)) {
+            console.log('Program being tested!!!');
+            const program = this.autotestService.getProgram(this.state.programDirectoryURI);
+            if (program === undefined || program.result === undefined) {
+                return;
+            }
+
+            this.setStateProcessing(program);
+            return;
+        }
+
+        const hasAutotests = await this.autotestService.hasAutotestsDefined(this.state.programDirectoryURI);
         if (!hasAutotests) {
             this.setState(state => {
                 state.autotestResults = [];
                 state.statusMessage = 'No autotests defined.';
+                state.progressMessage = '';
             });
             return;
         }
 
-        try {
-            const content = await this.autotestService.loadAutotestResultsFile(this.state.programDirectoryURI ?? '')
-            const results = JSON.parse(content);
-            const simpleResults = this.getSimpleTestResultsFromAutotestResult(results);
-            this.setState(state => {
-                state.autotestResults = simpleResults;
-                state.statusMessage = '';
-            });
-        } catch (err) {
-            this.setState(state => {
-                state.autotestResults = [];
-                state.statusMessage = '';
-            });
-        }
-    }
-
-    private getSimpleTestResultsFromAutotestResult(results: any) {
-        const testResults = Object.entries(results.test_results);
-        return testResults.map(([id, testResult]) => {
-            const { success, status } = testResult as SimpleTestResult;
-            return {
-                id, success, status,
-            };
-        });
+        await this.setStateFinished(this.state.programDirectoryURI);
     }
 
     protected render(): React.ReactNode {
@@ -165,13 +164,12 @@ export class AutotestViewWidget extends ReactWidget {
         </div>
     }
 
-    // TODO: Improve list item and implement detailed results view...
-    //       
-    private renderTestResultItem(result: SimpleTestResult): React.ReactNode {
+    private renderTestResultItem(result: TestResult): React.ReactNode {
         return <li key={result.id}>
+            <hr/>
             <span>{`Test ${result.id}`}</span>
-            <span>{result.success}</span> |
-            <span>{result.status}</span>
+            <br/>
+            <span>{result.status.toString()}</span>
         </li>
     }
 
@@ -182,66 +180,39 @@ export class AutotestViewWidget extends ReactWidget {
             return;
         }
 
+        if(this.autotestService.isBeingTested(this.state.programDirectoryURI)) {
+            this.messageService.info("Allready running tests. Please wait...");
+            return;
+        }
+
         try {
             this.setState(state => {
+                state.statusMessage = 'Initializing testing...';
                 state.autotestResults = [];
+                state.progressMessage = '';
             });
-            const runInfo = await this.autotestService.runTests(this.state.programDirectoryURI)
+
+            const runInfo = await this.autotestService.runTests(this.state.programDirectoryURI);
             if (!runInfo.success) {
                 let message = "";
                 if (runInfo.status === AutotestRunStatus.ERROR_OPENING_DIRECTORY) {
                     message = "Could not open directory.";
                 } else if (runInfo.status === AutotestRunStatus.NO_AUTOTESTS_DEFINED) {
                     message = "No autotests defined.";
+                } else if (runInfo.status === AutotestRunStatus.RUNNING) {
+                    message = "Allready running tests...";
                 }
                 this.setState(state => {
-                    state.progressMessage = message;
+                    state.statusMessage = message;
                 });
             }
         } catch (err) {
             this.setState(state => {
-                state.progressMessage = err;
+                state.statusMessage = err;
+                state.progressMessage = '';
+                state.autotestResults = [];
             });
         }
-
-        // PROGRAM COMPILE ERROR
-        // if (programStatus === 3) {
-        //     // Show error messages...
-        //     this.currentAutotestResults = [];
-        //     this.setCurrentProgramMessage("Program could not compile.");
-        //     return;
-        // }
-
-        // // PROGRAM_FINISHED_TESTING
-        // if (programStatus === 4) {
-        //     await this.writeAutotestResultsFile(dirURI, JSON.stringify(result, null, 4));
-        //     this.setSimpleTestResultsFromAutotestResult(result);
-        //     this.setCurrentProgramMessage("Finished testing.");
-        //     return;
-        // }
-
-        // // PROGRAM_NO_SORUCES_FOUND
-        // if (programStatus === 6) {
-        //     this.currentAutotestResults = [];
-        //     this.setCurrentProgramMessage("No program sources found.");
-        //     return;
-        // }
-
-        // // PROGRAM_CURRENTLY_TESTING
-        // if (programStatus === 7) {
-        //     // Display progress...
-        //     this.currentAutotestResults = [];
-        //     this.setCurrentProgramMessage("Testing...");
-        //     return;
-        // }
-
-        // // PROGRAM_REJECTED
-        // if (programStatus === 8) {
-        //     // Display message that the program needs to be retested...
-        //     this.currentAutotestResults = [];
-        //     this.setCurrentProgramMessage("Could not test program. Please try again...");
-        //     return;
-        // }
 
     }
 
