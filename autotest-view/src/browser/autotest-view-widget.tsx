@@ -125,7 +125,6 @@ export class AutotestViewWidget extends ReactWidget {
         }
 
         if (this.autotestService.isBeingTested(this.state.programDirectoryURI)) {
-            console.log('Program being tested!!!');
             const program = this.autotestService.getProgram(this.state.programDirectoryURI);
             if (program === undefined || program.result === undefined) {
                 return;
@@ -164,12 +163,12 @@ export class AutotestViewWidget extends ReactWidget {
         </div>
     }
 
+    // TODO: Add onClick handler to open the details view!!!
+    //       Try to open the view in a new tab or, if it must be, a new window
     private renderTestResultItem(result: TestResult): React.ReactNode {
-        return <li key={result.id}>
-            <hr/>
-            <span>{`Test ${result.id}`}</span>
-            <br/>
-            <span>{result.status.toString()}</span>
+        return <li key={result.id} className={`test-result ${result.success ? 'test-success' : 'test-fail'}`} >
+            <span className="test-name" >{`Test ${result.id}`}</span>
+            <span className="test-status">{result.status.toString()}</span>
         </li>
     }
 

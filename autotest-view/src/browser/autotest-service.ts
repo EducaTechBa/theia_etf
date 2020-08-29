@@ -180,8 +180,6 @@ export class AutotestService {
                 }))
         );
 
-        // TODO: Fix setting progrma files. AGAIN IDIOT!!!!!!!!!!!!!!
-
         const files = await Promise.all(promises);
         await this.autotester.setProgramFiles(program.id, files);
         console.log("Source files are set...");
@@ -287,7 +285,7 @@ export class AutotestService {
         return await this.workspaceService.containsSome([trimmed]);
     }
 
-    public async loadAutotestResultsFile(dirURI: string): Promise<string | undefined> {
+    private async loadAutotestResultsFile(dirURI: string): Promise<string | undefined> {
         try {
             const uri = `${dirURI}/${this.AUTOTEST_RESULTS_FILENAME}`;
             const file = await this.fileSystem.resolveContent(uri);
