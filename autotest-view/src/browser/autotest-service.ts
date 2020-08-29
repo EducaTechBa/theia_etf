@@ -224,11 +224,13 @@ export class AutotestService {
         const responseResult = await this.autotester.getResults(program.id);
         program.status = this.integerToProgramStatus(responseResult.status);
 
+        const testResultsObjects = responseResult.test_results ?? [];
+
         const result: Result = {
             inQueue: responseResult.queue_items ?? 0,
             isWaiting: program.status === ProgramStatus.PROGRAM_AWAITING_TESTS,
             isBeingTested: program.status === ProgramStatus.PROGRAM_CURRENTLY_TESTING,
-            completedTests: Object.entries(responseResult.test_results).length,
+            completedTests: Object.entries(testResultsObjects).length,
             testResults: [],
         };
 
