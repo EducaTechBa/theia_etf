@@ -1,0 +1,56 @@
+#widget-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-items: flex-start;
+    padding: 0px 16px;
+    max-width: 480px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+#widget-container * {
+    box-sizing: border-box;
+}
+
+.run-tests-button {
+    margin: 16px 0px !important;
+}
+
+.test-list {
+    list-style: none;
+    padding: 0px;
+    margin: 8px 0px;
+    width: 100%;
+}
+
+.test-result {
+    padding: 4px 8px;  
+    margin: 4px 0px;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+
+.test-result:hover {
+    background-color: var(--theia-list-inactiveSelectionBackground);
+}
+
+.test-name {
+    display: inline-block;
+}
+
+.test-status {
+    display: inline-block;
+    margin-left: 4px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.test-success {
+    border-left: 3px solid #23d18b;
+}
+
+.test-fail {
+    border-left: 3px solid #f14c4c;
+}
