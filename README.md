@@ -24,10 +24,14 @@ docker container exec -it theia "bash"
 
 The application needs to be built initially and dependencies need to be pulled. To do so, run the following at the root of the repository:
 ```bash
-./build.sh
+yarn
 ```
-This script will use *yarn* (a nodejs package manager) to pull all the dependencies of the application. After that it runs the build process to compile the typescript source code to javascript.
+*yarn* (a nodejs package manager) will pull all the dependencies of the application. After that it runs the build process to compile the typescript source code to javascript.
 
+After the initial build, to rebuild the application later on, use:
+```bash
+yarn prepare
+```
 After the build is done, run the following script to start the application:
 ```bash
 ./start.sh
