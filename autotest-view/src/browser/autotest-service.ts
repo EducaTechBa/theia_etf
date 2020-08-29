@@ -342,4 +342,26 @@ export class AutotestService {
         return program !== undefined && program.result !== undefined;
     }
 
+    public async getResultsPage(dirURI: string, taskID: number): Promise<string | undefined> {
+        const autotestContent = await this.loadAutotestFile(dirURI);
+        const resultsContent = await this.loadAutotestResultsFile(dirURI);
+
+        if(autotestContent === undefined || resultsContent === undefined) {
+            return undefined;
+        }
+
+        const autotest = encodeURIComponent(autotestContent);
+        const results = encodeURIComponent(resultsContent);
+
+        const url = `/autotester/render/render.php?language=bs`
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: `task=${autotest}&result=${results}&test=${taskID}`
+        });
+        return res.text();
+    }
+
 }
