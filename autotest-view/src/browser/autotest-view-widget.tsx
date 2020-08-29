@@ -181,8 +181,13 @@ export class AutotestViewWidget extends ReactWidget {
             return;
         }
 
-        const html = await this.autotestService.getResultsPage(this.state.programDirectoryURI, taskID);
-        console.log(html);
+        this.messageService.info(`Opening 'Test ${taskID}' results...`);
+
+        const content = await this.autotestService.getResultsPage(this.state.programDirectoryURI, taskID);
+
+        const newWindow = window.open('', '_blank', 'toolbar=0,scrollbars=1,location=0,statusbar=0,menubar=0,resizable=1');
+        newWindow?.document.write(content ?? 'Could not load results...');
+        newWindow?.document.close();
     }
 
     // TODO: Disable the 'Run Tests' button for current program
