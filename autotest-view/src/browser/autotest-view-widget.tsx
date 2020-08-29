@@ -112,7 +112,7 @@ export class AutotestViewWidget extends ReactWidget {
 
         const uri = editorWidget.getResourceUri()?.parent.toString();
 
-        if (uri === undefined || this.state.programDirectoryURI === uri ) {
+        if (uri === undefined || this.state.programDirectoryURI === uri) {
             return;
         }
 
@@ -120,7 +120,7 @@ export class AutotestViewWidget extends ReactWidget {
             state.programDirectoryURI = uri;
         });
 
-        if(this.state.programDirectoryURI === undefined) {
+        if (this.state.programDirectoryURI === undefined) {
             return;
         }
 
@@ -166,10 +166,23 @@ export class AutotestViewWidget extends ReactWidget {
     // TODO: Add onClick handler to open the details view!!!
     //       Try to open the view in a new tab or, if it must be, a new window
     private renderTestResultItem(result: TestResult): React.ReactNode {
-        return <li key={result.id} className={`test-result ${result.success ? 'test-success' : 'test-fail'}`} >
+        return <li
+            key={result.id}
+            className={`test-result ${result.success ? 'test-success' : 'test-fail'}`}
+            onClick={() => this.handleOpenTestResult(result.id)}
+        >
             <span className="test-name" >{`Test ${result.id}`}</span>
             <span className="test-status">{result.status.toString()}</span>
         </li>
+    }
+
+    private async handleOpenTestResult(taskID: number) {
+        if (this.state.programDirectoryURI === undefined) {
+            return;
+        }
+
+        const html = await this.autotestService.getResultsPage(this.state.programDirectoryURI, taskID);
+        console.log(html);
     }
 
     // TODO: Disable the 'Run Tests' button for current program
@@ -179,7 +192,7 @@ export class AutotestViewWidget extends ReactWidget {
             return;
         }
 
-        if(this.autotestService.isBeingTested(this.state.programDirectoryURI)) {
+        if (this.autotestService.isBeingTested(this.state.programDirectoryURI)) {
             this.messageService.info("Allready running tests. Please wait...");
             return;
         }
