@@ -32,15 +32,15 @@ After the initial build, to rebuild the application later on, use:
 ```bash
 yarn prepare
 ```
-After the build is done, run the following script to start the application:
+After the build is done, run the following command to start the application:
 ```bash
-./start.sh
+yarn --cwd app/ start --hostname=0.0.0.0
 ```
 The script runs the *start* command defined in `app/package.json`. The default *port* used is `3000` and the default *hostname* is `0.0.0.0` (This is important when runnning the application in a container). An optional parameter is the path to the workspace folder you wish the application to open (Can be done in the application when it starts).
 
 For example:
 ```bash
-./start.sh /path/to/workspace --port=8080 --hostname=0.0.0.0
+yarn --cwd app/ start /path/to/workspace --port=8080 --hostname=0.0.0.0
 ```
 
 ## Creating a new extension
