@@ -17,9 +17,13 @@ export class Autotester {
     // Call getTask, not setTask?
     public async setTask(autotest: any): Promise<string> {
         const autotestQuery = encodeURIComponent(JSON.stringify(autotest));
-        const url = this.makeURL('setTask', `task=${autotestQuery}`);
+        const url = this.makeURL('setTask', '');
         const res = await fetch(url, {
-            method: 'POST'
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: `task=${autotestQuery}`
         });
         const data = await res.json();
 
@@ -31,10 +35,14 @@ export class Autotester {
     public async setProgram(taskID: string): Promise<string> {
         const program = { task: taskID, name: '' };
         const programQuery = encodeURIComponent(JSON.stringify(program));
-        const url = this.makeURL('setProgram', `program=${programQuery}`);
+        const url = this.makeURL('setProgram', '');
 
         const res = await fetch(url, {
-            method: 'POST'
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: `program=${programQuery}`
         });
 
         const data = await res.json();
