@@ -4,7 +4,6 @@ lib
 *.log
 *-app/*
 !*-app/package.json
-yarn.lock
 src-gen
 gen-webpack.config.js
 webpack.config.js
