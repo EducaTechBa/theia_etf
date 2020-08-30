@@ -183,11 +183,16 @@ export class AutotestViewWidget extends ReactWidget {
 
         this.messageService.info(`Opening 'Test ${taskID}' results...`);
 
-        const content = await this.autotestService.getResultsPage(this.state.programDirectoryURI, taskID);
+        const content = await this.autotestService.getResultsPage(this.state.programDirectoryURI, taskID) ?? ''; 
+        const newWindow = window.open('/autotester/render/render.php', 'view', 'toolbar=0,scrollbars=1,location=0,statusbar=0,menubar=0,resizable=0,width=700,height=700,left=312,top=234');
 
-        const newWindow = window.open('', '_blank', 'toolbar=0,scrollbars=1,location=0,statusbar=0,menubar=0,resizable=1');
-        newWindow?.document.write(content ?? 'Could not load results...');
-        newWindow?.document.close();
+        if(newWindow) {
+            let html = content.replace('render.css', '/autotester/render/render.css');
+            html = html.replace('render.js', '/autotester/render/render.js');
+            html = html.replace('jsdiff/diff.js', '/autotester/render/jsdiff/diff.js');
+            newWindow.document.write(html);
+        }
+
     }
 
     // TODO: Disable the 'Run Tests' button for current program
