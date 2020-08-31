@@ -45,7 +45,7 @@ export class AssignmentsDataProvider {
     }
 
     private mapCourseDataToCourseDirectory(courseInfo: CourseInfo, courseData: any): Directory {
-        const tutorials = courseData.data;
+        const tutorials = courseData.data ?? [];
         const subdirectories = tutorials.map((t: any) => this.mapTutorialDataToDirectory(courseInfo.id, t));
 
         return {
@@ -59,7 +59,7 @@ export class AssignmentsDataProvider {
 
     private mapTutorialDataToDirectory(courseID: string, tutorial: any): Directory {
         const path = tutorial.path;
-        const assignments = tutorial.items.map((a: any) => this.mapAssignmentData(courseID, a));
+        const assignments = (tutorial.items ?? []).map((a: any) => this.mapAssignmentData(courseID, a));
 
         return {
             id: path,
@@ -72,7 +72,7 @@ export class AssignmentsDataProvider {
 
     private mapAssignmentData(courseID: string, assignment: any): Assignment {
         const path = assignment.path;
-        const files = assignment.files.map((f: any) => this.mapFileData(f));
+        const files = (assignment.files ?? []).map((f: any) => this.mapFileData(f));
 
         return {
             id: assignment.id,
