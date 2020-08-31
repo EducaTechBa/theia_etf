@@ -348,7 +348,7 @@ export class AutotestService {
         const autotestContent = await this.loadAutotestFile(dirURI);
         const resultsContent = await this.loadAutotestResultsFile(dirURI);
 
-        if(autotestContent === undefined || resultsContent === undefined) {
+        if (autotestContent === undefined || resultsContent === undefined) {
             return undefined;
         }
 
@@ -364,6 +364,42 @@ export class AutotestService {
             body: `task=${autotest}&result=${results}&test=${taskID}`
         });
         return res.text();
+    }
+
+    public async openResultsPage(dirURI: string, testID: number) {
+        const autotestContent = await this.loadAutotestFile(dirURI);
+        const resultsContent = await this.loadAutotestResultsFile(dirURI);
+
+        if (autotestContent === undefined || resultsContent === undefined) {
+            return undefined;
+        }
+
+        const form = document.createElement("form");
+        form.setAttribute("id", "renderer_form");
+        form.setAttribute("method", "post");
+        form.setAttribute("action", "/autotester/render/render.php");
+        form.setAttribute("target", "view");
+
+        const hiddenField = document.createElement("input");
+        hiddenField.setAttribute("type", "hidden");
+        hiddenField.setAttribute("name", "task");
+        hiddenField.setAttribute("value", autotestContent);
+        form.appendChild(hiddenField);
+        const hiddenField1 = document.createElement("input");
+        hiddenField1.setAttribute("type", "hidden");
+        hiddenField1.setAttribute("name", "result");
+        hiddenField1.setAttribute("value", resultsContent);
+        form.appendChild(hiddenField1);
+        const hiddenField2 = document.createElement("input");
+        hiddenField2.setAttribute("type", "hidden");
+        hiddenField2.setAttribute("name", "test");
+        hiddenField2.setAttribute("value", testID.toString());
+        form.appendChild(hiddenField2);
+        document.body.appendChild(form);
+
+        window.open('', 'view', 'toolbar=0,scrollbars=1,location=0,statusbar=0,menubar=0,resizable=0,width=700,height=700,left=312,top=234');
+        form.submit();
+        document.body.removeChild(form);
     }
 
 }
