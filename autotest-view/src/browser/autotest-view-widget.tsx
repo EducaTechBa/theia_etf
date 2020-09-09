@@ -148,7 +148,7 @@ export class AutotestViewWidget extends ReactWidget {
     }
 
     protected render(): React.ReactNode {
-        return <div id='widget-container'>
+        return <div id='autotests-container'>
             <button
                 className="theia-button run-tests-button"
                 onClick={() => this.handleRunTests()}
