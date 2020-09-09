@@ -1,6 +1,13 @@
-#widget-container {
+#top-bar-container {
     color: var(--theia-ui-font-color1);
     display: inline-flex;
+    flex-direction: row;
     align-items: center;
+    justify-items: space-between;
     height: 100%;
+    width: 100%;
+}
+
+.button-icon {
+    margin-right: 4px;
 }
