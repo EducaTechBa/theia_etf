@@ -55,7 +55,7 @@ export class TopBarWidget extends ReactWidget {
             const uri = editorWidget?.getResourceUri()
             this.editorFileURI = uri;
 
-            if(uri) {
+            if (uri) {
                 this.isHomeworkAssignment = await this.homeworkSubmit.isHomeworkAssignment(uri.parent.toString());
             } else {
                 this.isHomeworkAssignment = false;
@@ -123,8 +123,12 @@ export class TopBarWidget extends ReactWidget {
         return this.renderButton({
             text: 'Log Out',
             iconClass: 'fa fa-sign-out',
-            onClick: () => this.messageService.info("Logging out...")
+            onClick: () => this.handleLogoutButtonClick()
         });
+    }
+
+    private async handleLogoutButtonClick() {
+        window.location.href = '/index.php?logout';
     }
 
 }
