@@ -11,3 +11,7 @@
 .button-icon {
     margin-right: 4px;
 }
+
+.not-homework {
+    display: none;
+}

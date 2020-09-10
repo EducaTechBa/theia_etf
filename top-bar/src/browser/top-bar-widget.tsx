@@ -4,6 +4,8 @@ import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core';
 import { TaskService } from '@theia/task/lib/browser';
 import { EditorManager, EditorWidget } from '@theia/editor/lib/browser';
+import URI from '@theia/core/lib/common/uri';
+import { HomeworkSubmit } from './homework-submit';
 
 interface TopBarButtonProps {
     text: string;
@@ -19,7 +21,8 @@ export class TopBarWidget extends ReactWidget {
     static readonly ID = 'top-bar:widget';
     static readonly LABEL = 'TopBar';
 
-    private editorFileURI: string | undefined;
+    private editorFileURI: URI | undefined;
+    private isHomeworkAssignment: boolean = false;
 
     @inject(MessageService)
     protected readonly messageService: MessageService;
@@ -29,6 +32,9 @@ export class TopBarWidget extends ReactWidget {
 
     @inject(EditorManager)
     protected readonly editorManager!: EditorManager;
+
+    @inject(HomeworkSubmit)
+    protected readonly homeworkSubmit: HomeworkSubmit;
 
     @postConstruct()
     protected async init(): Promise<void> {
@@ -44,9 +50,18 @@ export class TopBarWidget extends ReactWidget {
         this.update();
     }
 
-    private handleEditorSwitch(editorWidget: EditorWidget | undefined) {
+    private async handleEditorSwitch(editorWidget: EditorWidget | undefined) {
         if (editorWidget !== undefined) {
-            this.editorFileURI = editorWidget?.getResourceUri()?.toString();
+            const uri = editorWidget?.getResourceUri()
+            this.editorFileURI = uri;
+
+            if(uri) {
+                this.isHomeworkAssignment = await this.homeworkSubmit.isHomeworkAssignment(uri.parent.toString());
+            } else {
+                this.isHomeworkAssignment = false;
+            }
+
+            this.update();
         }
     }
 
@@ -81,7 +96,7 @@ export class TopBarWidget extends ReactWidget {
 
     private async handleRunButtonClick() {
         if (this.editorFileURI) {
-            this.taskService.runTaskByLabel(0, 'Build and Run');
+            this.taskService.runTaskByLabel(0, 'C - Build and Run');
         }
     }
 
@@ -90,8 +105,18 @@ export class TopBarWidget extends ReactWidget {
             text: 'Submit',
             tooltip: 'Submit current homework program',
             iconClass: 'fa fa-envelope',
-            onClick: () => this.messageService.info("Submit button pressed...")
+            classNames: this.isHomeworkAssignment ? '' : 'not-homework',
+            onClick: () => this.handleSubmitButtonClick()
         });
+    }
+
+    private async handleSubmitButtonClick() {
+        if (this.editorFileURI === undefined) {
+            return;
+        }
+
+        const dirURI = this.editorFileURI.parent.toString();
+        await this.homeworkSubmit.submitHomework(dirURI);
     }
 
     private renderLogoutButton(): React.ReactNode {
