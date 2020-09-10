@@ -33,8 +33,8 @@ export class HomeworkSubmit {
     }
 
     public async isHomeworkAssignment(dirURI: string): Promise<boolean> {
-        const homeworkFilePath = `${dirURI}/${HomeworkSubmit.HOMEWORK_FILE_NAME}`;
-        console.log(`Zadaca path: ${homeworkFilePath}`);
+        const relDirURI = dirURI.slice(this.workspaceService.workspace?.uri.length);
+        const homeworkFilePath = `${relDirURI}/${HomeworkSubmit.HOMEWORK_FILE_NAME}`;
         return this.workspaceService.containsSome([ homeworkFilePath ]);
     }
 
