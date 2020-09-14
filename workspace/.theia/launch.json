@@ -4,7 +4,26 @@
   "version": "0.2.0",
   "configurations": [
       {
-          
-      } 
+          "name": "C/C++ Launch",
+          "type": "cppdbg",
+          "request": "launch",
+          "program": "${fileDirname}/${fileBasenameNoExtension}",
+          "args": [],
+          "environment": [],
+          "presentation": {},
+          "cwd": "${fileDirname}",
+          "setupCommands": [
+              {
+                  "text": "-enable-pretty-printing",
+                  "description": "enable pretty printing",
+                  "ignoreFailures": false
+              },
+              {
+                  "text": "handle SIGPIPE nostop noprint pass",
+                  "description": "ignore SIGPIPE",
+                  "ignoreFailures": false
+              }
+          ]
+      }
   ]
 }

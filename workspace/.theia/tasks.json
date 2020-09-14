@@ -3,13 +3,16 @@
         {
             "label": "hello",
             "type": "shell",
-            "command": "sleep 1s && echo ${env:USERNAME}",
-            "problemMatcher": []
+            "command": "sleep 1s && echo \"Hello World\"",
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${fileDirname}"
+            }
         },
         {
-            "label": "Run",
+            "label": "Build and Run",
             "type": "shell",
-            "command": "clear && sleep 1s && gcc ${file} -o ${fileBasenameNoExtension} && ./${fileBasenameNoExtension}",
+            "command": "sleep 1s && gcc ${file} -o ${fileBasenameNoExtension} && ./${fileBasenameNoExtension}",
             "problemMatcher": [],
             "options": {
                 "cwd": "${fileDirname}"
@@ -21,6 +24,35 @@
                 "showReuseMessage": false,
                 "clear": true
             }
+        },
+        {
+            "label": "Build",
+            "type": "shell",
+            "command": "sleep 1 && echo \"${file} -o ${fileDirname}/${fileBasenameNoExtension}\"",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "presentation": {
+                "reveal": "always",
+                "focus": true,
+                "panel": "dedicated",
+                "showReuseMessage": false,
+                "clear": true
+            }
+        },
+        {
+            "label": "Run",
+            "type": "shell",
+            "command": "./${fileBaseNameNoExtension}",
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
         }
     ]
 }

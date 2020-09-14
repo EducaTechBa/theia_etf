@@ -10,7 +10,6 @@
     "@theia/file-search": "latest",
     "@theia/filesystem": "latest",
     "@theia/getting-started": "latest",
-    "@theia/json": "latest",
     "@theia/keymaps": "latest",
     "@theia/markers": "latest",
     "@theia/messages": "latest",
@@ -33,7 +32,8 @@
     "@theia/workspace": "latest",
     "run-button": "0.0.0",
     "assignments-view": "0.0.0",
-    "autotest-view": "0.0.0"
+    "autotest-view": "0.0.0",
+    "top-bar": "0.0.0"
   },
   "devDependencies": {
     "@theia/cli": "latest"
@@ -56,8 +56,9 @@
   },
   "theiaPluginsDir": "plugins",
   "theiaPlugins": {
-    "vscode-builtin-cpp": "https://github.com/theia-ide/vscode-builtin-extensions/releases/download/v1.39.1-prel/cpp-1.39.1-prel.vsix",
+    "vscode-cpptools": "https://github.com/microsoft/vscode-cpptools/releases/download/0.29.0/cpptools-linux.vsix",
     "vscode-builtin-configuration-editing": "http://open-vsx.org/api/vscode/configuration-editing/1.39.1/file/vscode.configuration-editing-1.39.1.vsix",
+    "vscode-builtin-json": "https://github.com/theia-ide/vscode-builtin-extensions/releases/download/v1.39.1-prel/json-1.39.1-prel.vsix",
     "vscode-editorconfig": "https://open-vsx.org/api/EditorConfig/EditorConfig/0.14.4/file/EditorConfig.EditorConfig-0.14.4.vsix"
   }
 }
