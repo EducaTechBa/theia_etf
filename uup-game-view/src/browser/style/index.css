@@ -5,3 +5,149 @@
     padding: 10px;
     text-transform: uppercase;
 }
+
+#uup-game-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-items: flex-start;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.student-info {
+    display:flex;
+    width: 100%;
+    flex-direction: column;
+}
+
+.assignments-list, .powerup-list {
+    list-style: none;
+    padding: 0px;
+    margin-top: 0 !important;
+    width: 100%;
+}
+
+.powerup-store {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.powerup-store-content {
+    display:flex;
+    flex-direction: column;
+    text-align: center;
+    padding-top: 10px;
+    margin: 0px 10px 0px 10px; 
+}
+
+.powerup-item {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    margin-bottom: 2px;
+}
+
+.assignment-header, .powerups-header {
+    line-height: var(--theia-view-container-title-height);
+    display: flex;
+    text-transform: uppercase;
+    align-items: center;
+    font-size: var(--theia-ui-font-size0);
+    font-weight: 450;
+    color: var(--theia-sideBarSectionHeader-foreground);
+    background: var(--theia-sideBarSectionHeader-background);
+    margin-bottom: 2px;
+}
+
+.progress-bar {
+    margin: 10px;
+    background: var(--theia-sideBarSectionHeader-background);
+}
+
+.progress-bar-span {
+    position: absolute;
+    left: 47%;
+    padding-top:2px;
+    color: white;
+}
+
+.assignment-locked {
+    display: inline-block;
+    text-align: justify;
+    padding-top:10px;
+    margin: 0px 10px 10px 10px;
+    color: #f14c4c;
+}
+
+.assignment-started, .assignment-finished {
+    display: flex;
+    flex-direction: column;
+    text-align: justify;
+    padding-top:10px;
+    margin: 0px 10px 10px 10px;
+}
+
+.start-assignment-button,.af-second-chance-button {
+    margin-left: 0px !important;
+    margin-top: 10px;
+}
+
+.assignment-progress {
+    display:inline-block;
+    text-align: center;
+    width: 100%;
+    padding-top: 10px; 
+}
+
+.student-header {
+    display:inline-block;
+    text-align: center;
+    width: 100%;
+    font-weight: 450;
+    font-size: 1.3em;
+}
+
+.student-level {
+    display: inline-block;
+    text-align: center;
+    width: 100%;
+    padding-top: 20px;
+}
+
+.student-xp {
+    display: inline-block;
+    text-align: center;
+    width: 100%;
+}
+
+.assignment-content {
+    display:flex;
+    flex-direction: column;
+    margin: 0px 10px 10px 10px;
+}
+
+.assignment-conent .span {
+    margin-bottom: 2px;
+}
+
+.progress-bar-green {
+    height: 20px;
+    background-color: #168c5c;
+}
+
+.progress-bar-xp {
+    height: 20px;
+    background-color: #802b82;
+}
+
+.collapse {
+    display:none;
+}
+
+.collapse.in {
+    display:block;
+}
+
