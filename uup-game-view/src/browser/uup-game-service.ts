@@ -32,6 +32,7 @@ export interface AssignmentDetails {
     started: boolean;
     finished: boolean;
     tasksFullyFinished: number;
+    tasksTurnedIn: number;
     points: number;
     currentTask: Task;
     powerupsUsed: UsedPowerup[];
@@ -41,6 +42,7 @@ export interface AssignmentDetails {
 export interface StudentData {
     student: string;
     tokens: number;
+    points: number;
     unusedPowerups: {name: string, amount: number}[];
     assignmentsData: AssignmentDetails[];
 }
@@ -200,44 +202,62 @@ export class GameService {
                     "assignment_id": 2,
                     "status": "In Progress"
                 },
-                {
-                    "assignment_id": 3,
-                    "status": "Completed"
-                }
             ],
             "currentTasks": [
                 {
                     "assignment_id": 2,
                     "task_number": 9,
                     "task_name": "Task 100"
-                }
+                },
             ],
             "assignmentPoints": [
                 {
                     "assignment_id": 1,
-                    "points": 2.94286,
-                    "count": "15"
+                    "points": 2.94286
                 },
                 {
                     "assignment_id": 2,
-                    "points": 1.57143,
-                    "count": "8"
+                    "points": 1.57143
+                }
+            ],
+            "completedTasks": [
+                {
+                    "assignment_id": 1,
+                    "completed": "13"
                 },
                 {
-                    "assignment_id": 3,
-                    "points": 3,
-                    "count": "15"
+                    "assignment_id": 2,
+                    "completed": "7"
+                }
+            ],
+            "turnedInTasks": [
+                {
+                    "assignment_id": 1,
+                    "turned_in": "15"
+                },
+                {
+                    "assignment_id": 2,
+                    "turned_in": "8"
                 }
             ]
-        };
+        }
         let studentData: StudentData = {
             student: data.student,
             tokens: data.tokens,
+            points: this.mapPoints(data),
             unusedPowerups: this.mapUnusedPowerupData(data.powerups, powerupTypes),
             assignmentsData: this.mapAssignmentDetails(data, assignments, powerupTypes, taskRequirement)
         }
         console.log("Student Data: ", studentData);
         return Promise.resolve(studentData);
+    }
+
+    private mapPoints(data: any): number {
+        let points = 0;
+        data.assignmentPoints.forEach( (x: any) => {
+            points += x.points;
+        });
+        return points;
     }
 
     private mapUsedPowerupData(data: any, powerupTypes: PowerupType[], _assignment_id: number): UsedPowerup[] {
@@ -273,13 +293,16 @@ export class GameService {
             if(index != -1) {
                 let _index = data.currentTasks.findIndex( (x: any) => { return x.assignment_id == assignment.id; } );
                 let _pIndex = data.assignmentPoints.findIndex( (x: any) => { return x.assignment_id == assignment.id; });
+                let _ffIndex = data.completedTasks.findIndex( (x: any) => { return x.assignment_id == assignment.id; });
+                let _tiIndex = data.turnedInTasks.findIndex( (x: any) => { return x.assignment_id == assignment.id; });
                 let _assignmentDetails : AssignmentDetails = {
                     id: assignment.id,
                     name: assignment.name,
                     unlocked: true,
                     started: true,
                     finished: data.assignmentProgress[index].status == "Completed",
-                    tasksFullyFinished: data.assignmentPoints[_pIndex].count,
+                    tasksFullyFinished: data.completedTasks[_ffIndex].completed,
+                    tasksTurnedIn: data.turnedInTasks[_tiIndex].turned_in,
                     points: data.assignmentPoints[_pIndex].points,
                     currentTask: (_index == -1) ? {name:"-1", taskNumber: -1} : {
                         name: data.currentTasks[_index].task_name,
@@ -297,6 +320,7 @@ export class GameService {
                     started: false,
                     finished: false,
                     tasksFullyFinished: 0,
+                    tasksTurnedIn: 0,
                     points: 0,
                     currentTask: {name:"-1", taskNumber: -1},
                     powerupsUsed: [],

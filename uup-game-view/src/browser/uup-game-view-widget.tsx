@@ -67,6 +67,38 @@ export class UupGameViewWidget extends ReactWidget {
         this.update();
     }
 
+    private getPowerupAmount(powerupName: string) : number {
+        let amount = 0;
+        this.state.studentData?.unusedPowerups.forEach( (x: any) => {
+            if(x.name == powerupName) {
+                amount = x.amount;
+            }
+        })
+        return amount;
+    }
+    
+    private collapseAssignment(assignment_id: number) {
+        this.state.studentData?.assignmentsData.forEach( (x: AssignmentDetails) => {
+            if(x.id==assignment_id)
+                x.collapsed = !x.collapsed;
+        });
+        this.setState(state => {
+            state.studentData = this.state.studentData;
+        });
+    }
+
+    private collapsePowerupStore() {
+        this.setState(state => {
+            state.storeOpen = !this.state.storeOpen;
+        });
+    }
+
+    private buyPowerup(powerupType: PowerupType) {
+        //Confirmation window
+        //Block while buying
+        //Send request
+    }
+
     protected render(): React.ReactNode {
         /*
         const header = `This is a sample widget which simply calls the messageService
@@ -93,7 +125,7 @@ export class UupGameViewWidget extends ReactWidget {
                     <span className={`theia-ExpansionToggle ${!this.state.storeOpen ? ' theia-mod-collapsed' : ''}`}></span>
                     <span className="label noselect">POWERUP STORE</span>
             </div>
-            <div className={`collapse ${!this.state.storeOpen ? ' in' : ''}`}>
+            <div className={`collapse ${this.state.storeOpen ? ' in' : ''}`}>
                 <div className="powerup-store-content">
                     <span style={{margin: '0px 0px 10px 0px'}}>Welcome to PowerUp store. Here you can exchange your tokens for power-ups.</span> 
                     <ul className="powerup-list">
@@ -115,12 +147,14 @@ export class UupGameViewWidget extends ReactWidget {
             key={powerupType.id}
         >
             <span className="powerup-item">
-                <span>
+                <span className="powerup-item-name">
                     <i className={`button-icon ${iconClass}`} aria-hidden="true"></i>
-                    {powerupType.name}
+                    &nbsp;{powerupType.name}
                 </span>
                 <span>
-                    <button className="theia-button">{powerupType.price}<i className="button-icon fa fa-coins" aria-hidden="true"></i></button>
+                    <button className="theia-button"
+                        onClick={ () => {this.buyPowerup(powerupType)} }
+                    >{powerupType.price}&nbsp;<i className="button-icon fa fa-cubes" aria-hidden="true"> </i></button>
                 </span>
 
             </span>
@@ -129,47 +163,39 @@ export class UupGameViewWidget extends ReactWidget {
     
     private renderGeneralStudentInfo(studentData?: StudentData) : React.ReactNode {
         const header = `Welcome ${this.state.studentData?.student}!` ;
+        let points : number = this.state.studentData?.points || 0;
+        let level = Math.floor(points) + 1;
+        let progress : number = (points - Math.floor(points))*100;
+        let xp = Math.floor(progress * 10);
         return <div className='student-info'>
-            <span className="assignment-progress">{header}</span>
-            <span className="assignment-progress">Level: 1</span>
+            <span className="student-header">{header}</span>
+            <span className="student-level">Level: {level}</span>
             <div className="progress-bar">
-                    <span className="progress-bar-span">30%</span>
-                    <div className="progress-bar-xp" style={{width: `30%`}}></div>
+                    <span className="progress-bar-span">{progress}</span>
+                    <div className="progress-bar-xp" style={{width: `${progress}%`}}></div>
             </div>
-            <span className="assignment-progress">XP: 123/300</span>
+            <span className="student-xp">XP: {xp}/1000</span>
+            {this.renderPowerupStatus()}
         </div>
     }
-    /*
+
+    private renderPowerupStatus() : React.ReactNode {
+        return <table className="powerups-table">
+            <tr>
+                <td><i className="fa fa-lightbulb-o" aria-hidden="true"></i></td>
+                <td><i className="fa fa-undo" aria-hidden="true"></i></td>
+                <td><i className="fa fa-exchange" aria-hidden="true"></i></td>
+                <td><i className="fa fa-cubes" aria-hidden="true"></i></td>
+            </tr>
+            <tr>
+                <td>{this.getPowerupAmount('Hint')}</td>
+                <td>{this.getPowerupAmount('Second Chance')}</td>
+                <td>{this.getPowerupAmount('Switch Task')}</td>
+                <td>{this.state.studentData?.tokens}</td>
+            </tr>
+        </table>
+    }  
     
-export interface AssignmentDetails {
-    id: number;
-    name: string;
-    unlocked: boolean; 
-    started: boolean;
-    finished: boolean;
-    tasksFullyFinished: number;
-    points: number;
-    currentTask?: Task;
-    powerupsUsed?: UsedPowerup[];
-}
-*/
-    private collapseAssignment(assignment_id: number) {
-        this.state.studentData?.assignmentsData.forEach( (x: AssignmentDetails) => {
-            if(x.id==assignment_id)
-                x.collapsed = !x.collapsed;
-        });
-        this.setState(state => {
-            state.studentData = this.state.studentData;
-        });
-    }
-
-    private collapsePowerupStore() {
-        this.setState(state => {
-            state.storeOpen = !this.state.storeOpen;
-        });
-    }
-
-    //Popraviti/dodati COUNT za max poene + broj predanih taskova;
     private renderAssignmentDetails(assignment: AssignmentDetails) : React.ReactNode {
         let content: React.ReactNode;
         if(!assignment.unlocked) {
@@ -192,18 +218,32 @@ export interface AssignmentDetails {
             </div>
         }
         else if(!assignment.finished) {
+            let percent = ((assignment.tasksTurnedIn/15)*100).toFixed(2);
+            //(Math.round(maxPointsPct * assignmentMaxPoints*100)/100).toFixed(2);
             content = 
             <div>
                 <span className="assignment-progress">Assignment Progress</span>
                 <div className="progress-bar">
-                    <span className="progress-bar-span">30%</span>
-                    <div className="progress-bar-green" style={{width: `30%`}}></div>
+                    <span className="progress-bar-span">{percent}%</span>
+                    <div className="progress-bar-green" style={{width: `${percent}%`}}></div>
                 </div>
                 <div className="assignment-content">
                     <span className="span">Total tasks: 15</span>
-                    <span className="span">Tasks turned in: 7</span>
+                    <span className="span">Tasks turned in: {assignment.tasksTurnedIn}</span>
+                    <span className="span">Tasks fully finished: {assignment.tasksFullyFinished}</span>
                     <span className="span">Current task: {assignment.currentTask.taskNumber}</span>
                     <span className="span">Task name: {assignment.currentTask.name}</span> 
+                </div>
+                <div className="powerups-buttons">
+                    <button className="theia-button powerup-button">
+                        <i className="fa fa-lightbulb-o" aria-hidden="true"></i>
+                    </button>
+                    <button className="theia-button powerup-button">
+                        <i className="fa fa-undo" aria-hidden="true"></i>
+                    </button>
+                    <button className="theia-button powerup-button">
+                        <i className="fa fa-exchange" aria-hidden="true"></i>
+                    </button>
                 </div>
             </div>
         }
@@ -214,7 +254,7 @@ export interface AssignmentDetails {
                 'Second Chance' you have another shot at completing one task in this assignment
                 which you didn't fully finish. Choose wisely!
                 </span>
-                <button className="theia-button af-second-chance-button">Use Second Chance power-up</button>
+                <button className="theia-button af-second-chance-button"><i className="fa fa-undo" aria-hidden="true"></i>&nbsp;Second Chance</button>
             </div>
         }
         return <li
@@ -237,4 +277,12 @@ export interface AssignmentDetails {
         this.messageService.info('Congratulations: UupGameView Widget Successfully Created!');
     }
 
+    /*
+    Implementirati: 
+    -Buy / Turn-in / Powerup-e
+    -Start assignment / second chance na zatvoren assignment.
+    Upozorenje o otkljucavanju iduceg assignment-a
+    Prikaz hinta na zadatku gdje je vec bio
+    Popraviti level/progress
+    */
 }

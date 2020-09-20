@@ -39,7 +39,7 @@
     flex-direction: column;
     text-align: center;
     padding-top: 10px;
-    margin: 0px 10px 0px 10px; 
+    margin: 0px 10px 10px 10px; 
 }
 
 .powerup-item {
@@ -48,7 +48,19 @@
     justify-content: space-between;
     flex-wrap: wrap;
     margin-bottom: 2px;
+    font-size: 1.2em;
+    font-weight: bold;
 }
+
+.powerup-item-name {
+    display: inline-flex;
+    align-items: center;
+}
+
+.powerup-item i {
+    width:15px;
+}
+
 
 .assignment-header, .powerups-header {
     line-height: var(--theia-view-container-title-height);
@@ -123,11 +135,42 @@
     width: 100%;
 }
 
+
+table.powerups-table {
+    margin: 10px;
+    border-spacing: 2px;
+    border-collapse: separate;
+}
+
+table.powerups-table td {
+    background: var(--theia-sideBarSectionHeader-background);
+    text-align: center;
+    padding: 7px;
+}
+
+.powerup-button {
+    margin: 2px !important;
+    width: 33%;
+}
+
+tr:first-child { font-size: 1.5em; }
+tr:first-child td:first-child { border-top-left-radius: 10px;}
+tr:first-child td:last-child { border-top-right-radius: 10px;}
+tr:last-child td:first-child { border-bottom-left-radius: 10px;}
+tr:last-child td:last-child { border-bottom-right-radius: 10px;}
+
 .assignment-content {
     display:flex;
     flex-direction: column;
     margin: 0px 10px 10px 10px;
 }
+
+.powerups-buttons {
+    display: flex;
+    flex-direction: row;
+    margin: 0px 10px 10px 10px;
+}
+
 
 .assignment-conent .span {
     margin-bottom: 2px;
