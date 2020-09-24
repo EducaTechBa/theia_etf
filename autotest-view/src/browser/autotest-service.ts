@@ -335,6 +335,23 @@ export class AutotestService {
         return program;
     }
 
+    public async getTestPassResults(dirURI: string): Promise<{ passed: number, total: number }> {
+        const program = await this.getProgramFromAutotestResultFile(dirURI);
+
+        if(program === undefined) {
+            return {
+                passed: -1,
+                total: -1,
+            };
+        }
+
+        const testResults = program.result?.testResults ?? [];
+        const total = testResults.length;
+        const passed = testResults.filter(testResult => testResult.success).length;
+
+        return { total, passed };
+    }
+
     private integerToTestResultStatus(status: number): TestResultStatus {
         return integerToTestResultStatusMapping[status];
     }
