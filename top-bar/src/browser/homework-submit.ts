@@ -1,6 +1,7 @@
 import { injectable, inject } from 'inversify';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
-import { FileSystem } from '@theia/filesystem/lib/common'
+import { FileService } from '@theia/filesystem/lib/browser/file-service';
+import URI from '@theia/core/lib/common/uri';
 
 @injectable()
 export class HomeworkSubmit {
@@ -10,8 +11,8 @@ export class HomeworkSubmit {
     @inject(WorkspaceService)
     protected readonly workspaceService: WorkspaceService;
 
-    @inject(FileSystem)
-    protected readonly fileSystem: FileSystem;
+    @inject(FileService)
+    protected readonly fileService: FileService;
 
     public async submitHomework(dirURI: string) {
         if(!this.isHomeworkAssignment(dirURI)) {
@@ -19,8 +20,8 @@ export class HomeworkSubmit {
         }
 
         const homeworkFilePath = `${dirURI}/${HomeworkSubmit.HOMEWORK_FILE_NAME}`;
-        const homeworkFile = await this.fileSystem.resolveContent(homeworkFilePath);
-        const homework = JSON.parse(homeworkFile.content);
+        const homeworkFile = await this.fileService.read(new URI(homeworkFilePath));
+        const homework = JSON.parse(homeworkFile.value);
 
         // filename query parameter is used by the service to determine the 
         // file directory... the homeworkFilePath is sufficient...
@@ -33,7 +34,7 @@ export class HomeworkSubmit {
     }
 
     public async isHomeworkAssignment(dirURI: string): Promise<boolean> {
-        const relDirURI = dirURI.slice(this.workspaceService.workspace?.uri.length);
+        const relDirURI = dirURI.slice(this.workspaceService.workspace?.resource.toString().length);
         const homeworkFilePath = `${relDirURI}/${HomeworkSubmit.HOMEWORK_FILE_NAME}`;
         return this.workspaceService.containsSome([ homeworkFilePath ]);
     }
