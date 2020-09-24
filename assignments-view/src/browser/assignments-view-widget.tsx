@@ -72,7 +72,7 @@ export class AssignmentsViewWidget extends TreeWidget {
     protected handleDblClickEvent(node: TreeNode | undefined, event: React.MouseEvent<HTMLElement>): void {
         if (node && AssignmentNode.is(node)) {
             this.assignmentDirectoryGeneration(node.assignment)
-                .catch(err => this.messageService.info(err));
+                .catch(err => this.messageService.info('An error occurred while generating assignment sources'));
             event.stopPropagation();
         } else {
             this.model.openNode(node);
@@ -82,7 +82,7 @@ export class AssignmentsViewWidget extends TreeWidget {
 
     private async assignmentDirectoryGeneration(assignment: Assignment) {
         const directoryExists = await this.workspaceService.containsSome([assignment.path]);
-        const workspaceURI = this.workspaceService.workspace?.uri || '';
+        const workspaceURI = this.workspaceService.workspace?.resource || '';
         const assignmentDirectoryURI = `${workspaceURI}/${assignment.path}`;
 
         if (!directoryExists) {
