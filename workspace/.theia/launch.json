@@ -1,29 +1,29 @@
 {
-  // Use IntelliSense to learn about possible attributes.
-  // Hover to view descriptions of existing attributes.
-  "version": "0.2.0",
-  "configurations": [
-      {
-          "name": "C/C++ Launch",
-          "type": "cppdbg",
-          "request": "launch",
-          "program": "${fileDirname}/${fileBasenameNoExtension}",
-          "args": [],
-          "environment": [],
-          "presentation": {},
-          "cwd": "${fileDirname}",
-          "setupCommands": [
-              {
-                  "text": "-enable-pretty-printing",
-                  "description": "enable pretty printing",
-                  "ignoreFailures": false
-              },
-              {
-                  "text": "handle SIGPIPE nostop noprint pass",
-                  "description": "ignore SIGPIPE",
-                  "ignoreFailures": false
-              }
-          ]
-      }
-  ]
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "C++ Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${fileDirname}/${fileBasenameNoExtension}",
+            "args": [],
+            "environment": [],
+            // "preLaunchTask": "C - Build Debug",
+            "cwd": "${fileDirname}",
+            "setupCommands": [
+                {
+                    "text": "-enable-pretty-printing",
+                    "description": "enable pretty printing",
+                    "ignoreFailures": false
+                },
+                {
+                    "text": "handle SIGPIPE nostop noprint pass",
+                    "description": "ignore SIGPIPE",
+                    "ignoreFailures": false
+                }
+            ]
+        }
+    ]
 }

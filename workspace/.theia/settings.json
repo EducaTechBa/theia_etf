@@ -1,5 +1,5 @@
 {
-    "editor.autoSave": "on",
+    "editor.autoSave": "off",
     "editor.acceptSuggestionOnEnter": "on",
     "editor.tabCompletion": "on",
     "editor.autoClosingBrackets": "always",
@@ -12,5 +12,12 @@
         "**/CVS": true,
         "**/.DS_Store": true,
         "**/.*": true
-    }
+    },
+    
+    "C_Cpp.intelliSenseEngine": "Disabled",
+    "C_Cpp.autocomplete": "Disabled",
+    "C_Cpp.errorSquiggles": "Disabled",
+
+    "clangd.path": "/usr/bin/clangd",
+    "clangd.arguments": ["-log=verbose", "-pretty", "--background-index", "--compile-commands-dir=/home/r/rfejzic/workspace/.theia/"]
 }
