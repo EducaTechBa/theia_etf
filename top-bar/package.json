@@ -5,15 +5,16 @@
   ],
   "version": "0.0.0",
   "description": "Desc",
-  
   "author": "Riajd",
-  
   "files": [
     "lib",
     "src"
   ],
   "dependencies": {
-    "@theia/core": "latest"
+    "@theia/core": "1.6.0",
+    "@theia/workspace": "1.6.0",
+    "@theia/filesystem": "1.6.0",
+    "@theia/editor": "1.6.0"
   },
   "devDependencies": {
     "rimraf": "latest",

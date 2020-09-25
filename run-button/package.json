@@ -14,8 +14,8 @@
   ],
   
   "dependencies": {
-    "@theia/core": "latest",
-    "@theia/task": "latest"
+    "@theia/core": "1.6.0",
+    "@theia/task": "1.6.0"
   },
   "devDependencies": {
     "rimraf": "latest",
