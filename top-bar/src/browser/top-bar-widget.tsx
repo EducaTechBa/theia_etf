@@ -2,10 +2,10 @@ import * as React from 'react';
 import { injectable, postConstruct, inject } from 'inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core';
-import { TaskService } from '@theia/task/lib/browser';
 import { EditorManager, EditorWidget } from '@theia/editor/lib/browser';
 import URI from '@theia/core/lib/common/uri';
 import { HomeworkSubmit } from './homework-submit';
+import { TaskRunner } from './task-runner';
 
 interface TopBarButtonProps {
     text: string;
@@ -27,14 +27,14 @@ export class TopBarWidget extends ReactWidget {
     @inject(MessageService)
     protected readonly messageService: MessageService;
 
-    @inject(TaskService)
-    protected readonly taskService: TaskService;
-
     @inject(EditorManager)
     protected readonly editorManager!: EditorManager;
 
     @inject(HomeworkSubmit)
     protected readonly homeworkSubmit: HomeworkSubmit;
+
+    @inject(TaskRunner)
+    protected readonly taskRunner: TaskRunner;
 
     @postConstruct()
     protected async init(): Promise<void> {
@@ -96,7 +96,7 @@ export class TopBarWidget extends ReactWidget {
 
     private async handleRunButtonClick() {
         if (this.editorFileURI) {
-            this.taskService.runTaskByLabel(0, 'C - Build and Run');
+            this.taskRunner.runTask(this.editorFileURI);
         }
     }
 
