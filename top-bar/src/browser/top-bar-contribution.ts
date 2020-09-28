@@ -7,6 +7,7 @@ import { FrontendApplicationStateService } from '@theia/core/lib/browser/fronten
 import { WorkspaceService } from '@theia/workspace/lib/browser';
 import { FrontendApplication, FrontendApplicationContribution } from '@theia/core/lib/browser';
 import { MaybePromise } from '@theia/core/lib/common/types';
+import { TerminalMenus, TerminalCommands } from '@theia/terminal/lib/browser/terminal-frontend-contribution';
 
 export const TopBarCommand: Command = { id: 'top-bar:command' };
 
@@ -32,10 +33,18 @@ export class TopBarContribution extends AbstractViewContribution<TopBarWidget> i
         commands.registerCommand(TopBarCommand, {
             execute: () => super.openView({ reveal: true })
         });
+
+        const terminalCommands = Object.entries(TerminalCommands);
+        terminalCommands
+            .forEach(([_, cmd]: [string, Command]) =>
+                commands.unregisterCommand(cmd)
+            );
     }
 
     registerMenus(menus: MenuModelRegistry): void {
         super.registerMenus(menus);
+
+        menus.unregisterMenuNode(TerminalMenus.TERMINAL[1]);
     }
 
     onStart(app: FrontendApplication): MaybePromise<void> {
