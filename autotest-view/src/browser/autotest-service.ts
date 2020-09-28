@@ -287,7 +287,6 @@ export class AutotestService {
     public async hasAutotestsDefined(dirURI: string): Promise<boolean> {
         const uri = `${dirURI}/${this.AUTOTEST_FILENAME}`;
         const workspaceUri = this.workspaceService.workspace?.resource.toString();
-        console.log(`This is the workspace URI: ${workspaceUri}`)
         const trimmed = uri.slice(workspaceUri?.length);
         return await this.workspaceService.containsSome([trimmed]);
     }
