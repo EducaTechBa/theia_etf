@@ -2,6 +2,7 @@
   "private": true,
   "scripts": {
     "prepare": "lerna run prepare",
+    "prepare-dev": "lerna run prepare-dev",
     "rebuild:browser": "theia rebuild:browser"
   },
   "devDependencies": {
