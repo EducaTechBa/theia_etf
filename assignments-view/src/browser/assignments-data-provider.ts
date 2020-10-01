@@ -26,7 +26,8 @@ export class AssignmentsDataProvider {
         return json.data.map((course: any) => ({
             id: course.id,
             name: course.name,
-            abbrev: course.abbrev
+            abbrev: course.abbrev,
+            external: course.external,
         }));
     }
 
@@ -37,7 +38,8 @@ export class AssignmentsDataProvider {
     }
 
     private async getCourseData(courseInfo: CourseInfo): Promise<any> {
-        const courseURL = (id: string) => this.makeURL(`/assignment/ws.php?action=assignments&external=1&course=${id}`);
+        const external = courseInfo.external ? 'external=1' : '';
+        const courseURL = (id: string) => this.makeURL(`/assignment/ws.php?action=assignments&${external}&course=${id}`);
 
         return fetch(courseURL(courseInfo.id), {
             credentials: 'include'
