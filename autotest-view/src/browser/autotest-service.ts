@@ -114,7 +114,7 @@ export class AutotestService {
 
     private readonly POLL_TIMEOUT_MS = 500;
     private readonly AUTOTEST_RESULTS_FILENAME = '.at_result';
-    private readonly AUTOTEST_FILENAME = '.autotest2';
+    private readonly AUTOTEST_FILENAME = '.autotest';
 
     private state: AutotesterState = { programs: {} };
 
