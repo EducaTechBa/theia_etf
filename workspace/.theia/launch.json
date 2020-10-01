@@ -4,14 +4,16 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "C++ Launch",
+            "name": "C++ Debug",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${fileDirname}/${fileBasenameNoExtension}",
+            "program": "${fileDirname}/.${fileBasenameNoExtension}",
             "args": [],
             "environment": [],
-            // "preLaunchTask": "C - Build Debug",
+            "preLaunchTask": "C - Build Debug",
             "cwd": "${fileDirname}",
+            "debugConsole": "hide",
+            "console": "integratedTerminal",
             "setupCommands": [
                 {
                     "text": "-enable-pretty-printing",

@@ -11,7 +11,7 @@
         {
             "label": "C - Build and Run",
             "type": "shell",
-            "command": "sleep 1s && gcc ${file} -o ${fileBasenameNoExtension} && ./${fileBasenameNoExtension}",
+            "command": "sleep 1s && gcc ${file} -o .${fileBasenameNoExtension} && ./.${fileBasenameNoExtension}",
             "problemMatcher": [],
             "options": {
                 "cwd": "${fileDirname}"
@@ -27,7 +27,7 @@
         {
             "label": "C - Build",
             "type": "shell",
-            "command": "sleep 1 && gcc ${file} -o ${fileDirname}/${fileBasenameNoExtension}",
+            "command": "sleep 1 && gcc ${file} -o ${fileDirname}/.${fileBasenameNoExtension}",
             "problemMatcher": [],
             "options": {
                 "cwd": "${fileDirname}"
@@ -36,7 +36,7 @@
         {
             "label": "C - Build Debug",
             "type": "shell",
-            "command": "sleep 1 && gcc -g ${file} -o ${fileDirname}/${fileBasenameNoExtension}",
+            "command": "gcc -g ${file} -o ${fileDirname}/.${fileBasenameNoExtension}.dbg",
             "problemMatcher": [],
             "options": {
                 "cwd": "${fileDirname}"
@@ -52,7 +52,7 @@
         {
             "label": "C - Run",
             "type": "shell",
-            "command": "${fileDirname}/${fileBasenameNoExtension}",
+            "command": "${fileDirname}/.${fileBasenameNoExtension}",
             "options": {
                 "cwd": "${fileDirname}"
             },
