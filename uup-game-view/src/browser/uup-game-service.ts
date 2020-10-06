@@ -35,6 +35,7 @@ export interface AssignmentDetails {
     tasksTurnedIn: number;
     points: number;
     currentTask: Task;
+    buyingPowerUp: boolean;
     powerupsUsed: UsedPowerup[];
     collapsed: boolean;
 }
@@ -53,6 +54,21 @@ export interface ChallengeConfig {
     maxPoints: number,
     maxPointsNoPowerups: number,
     tasksRequired: number
+}
+
+export interface PowerupResponse {
+    success: boolean;
+    message: string;
+    powerupType: string;
+    price: number;
+    tokens: number;
+}
+
+export interface HintResponse {
+    success: boolean;
+    message: string;
+    hint: string;
+    tokens: number;
 }
 
 @injectable()
@@ -161,6 +177,68 @@ export class GameService {
             maxPointsNoPowerups: 300,
             tasksRequired: 5
         })
+    }
+
+    public async getTaskCategories() : Promise<void> {
+        return Promise.resolve();
+    }
+
+    private async delay(ms: number) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    public async buyPowerup(powerupType: PowerupType) : Promise<PowerupResponse> {
+        let powerupResponse = {
+            success: false,
+            message: "",
+            powerupType: "1",
+            price: 0,
+            tokens: 0
+        };
+        await this.delay(10000).then( ()=> {
+            powerupResponse = {
+                "success": true,
+                "message": "Powerup added to student mmesihovic1",
+                "powerupType": "1",
+                "price": 60,
+                "tokens": 936
+            };
+        });   
+        return Promise.resolve(powerupResponse); 
+    }
+
+    public async useHint(assignment: AssignmentDetails) : Promise<HintResponse> {
+        let hintResponse = {
+            success: false,
+            message: "",
+            hint: "",
+            tokens: 0
+        }
+        await this.delay(10000).then( () => {
+            hintResponse = {
+                success: true,
+                message: "m",
+                hint: "Testni hint za neki zadatak",
+                tokens: 0
+            };
+        });
+        return Promise.resolve(hintResponse);
+    }
+
+    public async getSecondChanceAvailableTasks(assignment: AssignmentDetails) : Promise<Task[]> {
+        return Promise.resolve([{
+            "name": "Testni task 1",
+            "taskNumber": 1
+        },
+        {
+            "name": "Testni task 3",
+            "taskNumber": 3
+        },
+        {
+            "name": "Testni task 4",
+            "taskNumber": 4
+        }]
+        );
     }
 
     public async getStudentData(assignments: Assignment[], powerupTypes: PowerupType[], taskRequirement: number) : Promise<StudentData> {
@@ -308,6 +386,7 @@ export class GameService {
                         name: data.currentTasks[_index].task_name,
                         taskNumber: data.currentTasks[_index].task_number
                     },
+                    buyingPowerUp: false,
                     powerupsUsed : this.mapUsedPowerupData(data.powerups, powerupTypes, assignment.id),
                     collapsed: false
                 }
@@ -323,6 +402,7 @@ export class GameService {
                     tasksTurnedIn: 0,
                     points: 0,
                     currentTask: {name:"-1", taskNumber: -1},
+                    buyingPowerUp: false,
                     powerupsUsed: [],
                     collapsed: false
                 }

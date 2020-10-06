@@ -153,6 +153,37 @@ table.powerups-table td {
     width: 33%;
 }
 
+.selectDialogueMessage {
+    white-space: pre-wrap;
+    text-align: justify !important;
+    color: white;
+    margin-bottom:10px;
+}
+
+.selectDialogueDropdown {
+    background-color: var(--theia-secondaryButton-background);
+    color: white;
+    font-size: 1em;
+}
+
+.powerup-button-turn-in {
+    margin: 2px !important;
+    width: 100%;
+    margin-bottom: 10px !important;
+}
+
+.theia-alert-message-container {
+    padding: 10px 5px !important;
+}
+
+.p-Widget.dialogOverlay select {
+    background: var(--theia-secondaryButton-background);
+}
+
+.p-Widget.dialogOverlay option {
+    background: var(--theia-secondaryButton-background);
+}
+
 tr:first-child { font-size: 1.5em; }
 tr:first-child td:first-child { border-top-left-radius: 10px;}
 tr:first-child td:last-child { border-top-right-radius: 10px;}
@@ -168,7 +199,7 @@ tr:last-child td:last-child { border-bottom-right-radius: 10px;}
 .powerups-buttons {
     display: flex;
     flex-direction: row;
-    margin: 0px 10px 10px 10px;
+    margin: 0px 10px 1px 10px;
 }
 
 

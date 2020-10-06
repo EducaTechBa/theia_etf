@@ -1,18 +1,21 @@
 import * as React from 'react';
 import { injectable, postConstruct, inject } from 'inversify';
-//import { AlertMessage } from '@theia/core/lib/browser/widgets/alert-message';
+import { AlertMessage } from '@theia/core/lib/browser/widgets/alert-message';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core';
 import { FileSystem } from '@theia/filesystem/lib/common';
 import { Assignment, PowerupType, StudentData, GameService, ChallengeConfig, AssignmentDetails} from './uup-game-service';
+import { ConfirmDialog } from '@theia/core/lib/browser';
+import { SelectDialog } from './select-dialogue';
 
 
 interface GameInformationState {
     storeOpen: boolean;
+    buyingPowerup: boolean;
     assignments: Assignment[];
     powerupTypes: PowerupType[];
-    challengeConfig?: ChallengeConfig;
-    studentData?: StudentData;
+    challengeConfig: ChallengeConfig;
+    studentData: StudentData;
 }
 
 
@@ -34,10 +37,23 @@ export class UupGameViewWidget extends ReactWidget {
 
     private state: GameInformationState = {
         storeOpen: false,
+        buyingPowerup: false,
         assignments: [],
         powerupTypes: [],
-        challengeConfig: undefined,
-        studentData: undefined
+        challengeConfig: {
+            enoughPoints: 0,
+            noPowerups: 0,
+            maxPoints: 0,
+            maxPointsNoPowerups: 0,
+            tasksRequired: 0
+        },
+        studentData: {
+            student: "",
+            tokens: 0,
+            points: 0,
+            unusedPowerups: [],
+            assignmentsData: []
+        }
     }
 
     @postConstruct()
@@ -51,6 +67,7 @@ export class UupGameViewWidget extends ReactWidget {
         const _assignments = await this.gameService.getAssignments();
         const _powerupTypes = await this.gameService.getPowerupTypes();
         const _challengeConfig = await this.gameService.getChallengeConfig();
+        //const _taskCategories = await this.gameService.getTaskCategories();
         const _studentData = await this.gameService.getStudentData(_assignments, _powerupTypes, _challengeConfig.tasksRequired);
         this.setState(state => {
             state.assignments = _assignments;
@@ -92,13 +109,131 @@ export class UupGameViewWidget extends ReactWidget {
             state.storeOpen = !this.state.storeOpen;
         });
     }
-
-    private buyPowerup(powerupType: PowerupType) {
+    //Testirati
+    private async buyPowerup(powerupType: PowerupType) {
         //Confirmation window
-        //Block while buying
-        //Send request
+        const dialog = new ConfirmDialog({
+            title: 'Buy power-up confirmation',
+            msg: `Are you sure you want to trade ${powerupType.price} tokens for power-up '${powerupType.name}'?`,
+            ok: "Yes",
+            cancel: "No"
+        });
+        const confirmation = await dialog.open();
+        if(confirmation) {
+            this.messageService.info(`Buying power-up '${powerupType.name}' for ${powerupType.price} tokens.`);
+            this.setState(state => {
+                state.buyingPowerup = true;
+            });
+            const response = await this.gameService.buyPowerup(powerupType);
+            if(response.success) {
+                this.messageService.info('Powerup bla bla bla has been basljdaldja');
+                const index = this.state.studentData?.unusedPowerups.findIndex( (x: any) => { return x.name == powerupType.name; });
+                if(index == -1)
+                    this.state.studentData?.unusedPowerups.push({name: powerupType.name, amount: 1});
+                else {
+                    this.state.studentData?.unusedPowerups.forEach( (x: any) => {
+                        if(x.name == powerupType.name)
+                            x.amount += 1;
+                    });
+                }
+                this.state.studentData.tokens = response.tokens;
+            } else {
+                this.messageService.error(`Buying power-up failed.`);
+            }
+            this.setState(state => {
+                state.buyingPowerup = false;
+                state.studentData = this.state.studentData;
+            });
+        }
+    }
+    
+    //Testirati
+    private async useHintPowerup(assignment: AssignmentDetails) {
+        const dialog = new ConfirmDialog({
+            title: "Use power-up confirmation",
+            msg: `Are you sure you want to use powerup 'Hint' on current task in this assignment?
+            This hint will be permanently visible while you are working on this task,
+            even if you return to it using power-up 'Second Chance'.`,
+            ok: "Yes",
+            cancel: "No"
+        });
+        const confirmation = await dialog.open();
+        if(confirmation) {
+            this.messageService.info(`Using power-up hint for current task.`);
+            this.setState(state => {
+                let index = state.studentData.assignmentsData.findIndex( x => x.id == assignment.id );
+                if(index != -1)
+                    state.studentData.assignmentsData[index].buyingPowerUp = true;
+            });
+            const response = await this.gameService.useHint(assignment);
+            if(response.success) {
+                this.messageService.info(`Power-up 'Hint' has been used successfully.`);
+                this.messageService.info(`Hint: ${response.hint}`);
+                const index = this.state.studentData?.unusedPowerups.findIndex( (x: any) => { return x.name == 'Hint'; });
+                this.state.studentData.unusedPowerups[index].amount -= 1;
+                this.state.studentData.tokens = response.tokens;
+            } else {
+                this.messageService.error(`Using power-up 'Hint' failed.`);
+            }
+            this.setState(state => {
+                let index = state.studentData.assignmentsData.findIndex( x => x.id == assignment.id );
+                if(index != -1)
+                    state.studentData.assignmentsData[index].buyingPowerUp = false;
+            });
+        }
     }
 
+    //Testirati
+    private async useSecondChancePowerup(assignment: AssignmentDetails) {
+        /*/const dialog = new ConfirmDialog({
+            title: "Use power-up confirmation",
+            msg: `Are you sure you want to use powerup 'Second Chance' and move to another task in this assignment?
+            All your current progress on this task will be saved. You can only return to a specific task once. Choose wisely!`,
+            ok: "Yes",
+            cancel: "No"
+        });
+*/
+        const tasks = await this.gameService.getSecondChanceAvailableTasks(assignment);
+        const result = await new SelectDialog({
+            items: tasks,
+            label: task => `${task.taskNumber}. ${task.name}`,
+            title: 'Second Chance',
+            message: `Are you sure you want to use 'Second Chance' power up?
+You can only return to tasks you haven't fully finished. All 
+progress on current task will be saved. You can only return to 
+specific task once, if you make changes you need to turn it in
+before using this power-up again. Below is a list of tasks with
+second chance available, choose wisely!`,
+            style: {
+            }
+        }).open();
+        console.log(result);
+        //const confirmation = await dialog.open();
+        /*if(confirmation) {
+            this.messageService.info(`Using power-up hint for current task.`);
+            this.setState(state => {
+                let index = state.studentData.assignmentsData.findIndex( x => x.id == assignment.id );
+                if(index != -1)
+                    state.studentData.assignmentsData[index].buyingPowerUp = true;
+            });
+            const response = await this.gameService.useHint(assignment);
+            if(response.success) {
+                this.messageService.info(`Power-up 'Hint' has been used successfully.`);
+                this.messageService.info(`Hint: ${response.hint}`);
+                const index = this.state.studentData?.unusedPowerups.findIndex( (x: any) => { return x.name == 'Hint'; });
+                this.state.studentData.unusedPowerups[index].amount -= 1;
+                this.state.studentData.tokens = response.tokens;
+            } else {
+                this.messageService.error(`Using power-up 'Hint' failed.`);
+            }
+            this.setState(state => {
+                let index = state.studentData.assignmentsData.findIndex( x => x.id == assignment.id );
+                if(index != -1)
+                    state.studentData.assignmentsData[index].buyingPowerUp = false;
+            });
+        }*/
+    }
+    
     protected render(): React.ReactNode {
         /*
         const header = `This is a sample widget which simply calls the messageService
@@ -152,7 +287,9 @@ export class UupGameViewWidget extends ReactWidget {
                     &nbsp;{powerupType.name}
                 </span>
                 <span>
-                    <button className="theia-button"
+                    <button 
+                        disabled= { this.state.buyingPowerup }
+                        className="theia-button"
                         onClick={ () => {this.buyPowerup(powerupType)} }
                     >{powerupType.price}&nbsp;<i className="button-icon fa fa-cubes" aria-hidden="true"> </i></button>
                 </span>
@@ -219,6 +356,7 @@ export class UupGameViewWidget extends ReactWidget {
         }
         else if(!assignment.finished) {
             let percent = ((assignment.tasksTurnedIn/15)*100).toFixed(2);
+            let hintContent = 'This is placeholder hint content.';
             //(Math.round(maxPointsPct * assignmentMaxPoints*100)/100).toFixed(2);
             content = 
             <div>
@@ -233,16 +371,35 @@ export class UupGameViewWidget extends ReactWidget {
                     <span className="span">Tasks fully finished: {assignment.tasksFullyFinished}</span>
                     <span className="span">Current task: {assignment.currentTask.taskNumber}</span>
                     <span className="span">Task name: {assignment.currentTask.name}</span> 
+                    <AlertMessage type='INFO' header={hintContent} />
                 </div>
                 <div className="powerups-buttons">
-                    <button className="theia-button powerup-button">
+                    <button 
+                        disabled= { assignment.buyingPowerUp }
+                        className="theia-button powerup-button"
+                         onClick={ () => {this.useHintPowerup(assignment)} }>
                         <i className="fa fa-lightbulb-o" aria-hidden="true"></i>
                     </button>
-                    <button className="theia-button powerup-button">
+                    <button 
+                        disabled= { assignment.buyingPowerUp }
+                        className="theia-button powerup-button"
+                        onClick = { () => {this.useSecondChancePowerup(assignment)} } >
                         <i className="fa fa-undo" aria-hidden="true"></i>
                     </button>
-                    <button className="theia-button powerup-button">
+                    <button 
+                        disabled= { assignment.buyingPowerUp }
+                        className="theia-button powerup-button"
+                        onClick = { () => {} } >
                         <i className="fa fa-exchange" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <div className="powerups-buttons">
+                    <button 
+                        disabled= { assignment.buyingPowerUp }
+                        className="theia-button powerup-button-turn-in"
+                         onClick={ () => {} }>
+                        <i className="fa fa-file-text" aria-hidden="true"></i>
+                        &nbsp;Turn current task in
                     </button>
                 </div>
             </div>
@@ -286,3 +443,4 @@ export class UupGameViewWidget extends ReactWidget {
     Popraviti level/progress
     */
 }
+  
