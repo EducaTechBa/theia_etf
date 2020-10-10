@@ -1,7 +1,8 @@
 import { injectable, inject } from "inversify";
 import { Emitter } from '@theia/core/lib/common/event';
 import { Autotester } from './autotester';
-import { FileSystem, FileStat } from '@theia/filesystem/lib/common';
+import { FileStatWithMetadata } from '@theia/filesystem/lib/common/files';
+import { FileService } from '@theia/filesystem/lib/browser/file-service';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
 import URI from '@theia/core/lib/common/uri';
 
@@ -113,7 +114,7 @@ export class AutotestService {
 
     private readonly POLL_TIMEOUT_MS = 500;
     private readonly AUTOTEST_RESULTS_FILENAME = '.at_result';
-    private readonly AUTOTEST_FILENAME = '.autotest2';
+    private readonly AUTOTEST_FILENAME = '.autotest';
 
     private state: AutotesterState = { programs: {} };
 
@@ -125,7 +126,7 @@ export class AutotestService {
 
     constructor(
         @inject(Autotester) private readonly autotester: Autotester,
-        @inject(FileSystem) private readonly fileSystem: FileSystem,
+        @inject(FileService) private readonly fileService: FileService,
         @inject(WorkspaceService) private readonly workspaceService: WorkspaceService,
     ) { }
 
@@ -157,7 +158,8 @@ export class AutotestService {
 
         console.log(`Program ID: ${program.id}`);
 
-        const dir = await this.fileSystem.getFileStat(dirURI);
+        const dir = await this.fileService.resolve(new URI(dirURI));
+
         if (!dir || !dir.isDirectory) {
             return {
                 success: false,
@@ -167,16 +169,18 @@ export class AutotestService {
 
         const filesStats = dir.children ?? [];
         const assignmentFiles = filesStats.map(file => ({
-            uri: file.uri,
-            name: new URI(file.uri).displayName
+            uri: file.resource,
+            name: new URI(file.resource.toString()).displayName
         }));
 
+
         const promises = assignmentFiles.map(file =>
-            this.fileSystem
-                .resolveContent(file.uri)
-                .then(({ content }) => ({
+            this.fileService
+                .read(file.uri)
+                .then(({ value }) => ({
                     ...file,
-                    content
+                    uri: file.uri.toString(),
+                    content: value
                 }))
         );
 
@@ -264,25 +268,25 @@ export class AutotestService {
     private async loadAutotestFile(dirURI: string): Promise<string | undefined> {
         try {
             const autotestURI = `${dirURI}/${this.AUTOTEST_FILENAME}`;
-            const autotestFile = await this.fileSystem.resolveContent(autotestURI);
-            const autotestContent = autotestFile.content;
+            const autotestFile = await this.fileService.read(new URI(autotestURI));
+            const autotestContent = autotestFile.value;
             return autotestContent;
         } catch (_) {
             return undefined;
         }
     }
 
-    private async writeAutotestResultsFile(dirURI: string, content: string): Promise<FileStat> {
+    private async writeAutotestResultsFile(dirURI: string, content: string): Promise<FileStatWithMetadata> {
         const uri = `${dirURI}/${this.AUTOTEST_RESULTS_FILENAME}`;
         try {
-            await this.fileSystem.delete(uri);
+            await this.fileService.delete(new URI(uri));
         } catch (_) { }
-        return await this.fileSystem.createFile(uri, { content });
+        return await this.fileService.create(new URI(uri), content);
     }
 
     public async hasAutotestsDefined(dirURI: string): Promise<boolean> {
         const uri = `${dirURI}/${this.AUTOTEST_FILENAME}`;
-        const workspaceUri = this.workspaceService.workspace?.uri;
+        const workspaceUri = this.workspaceService.workspace?.resource.toString();
         const trimmed = uri.slice(workspaceUri?.length);
         return await this.workspaceService.containsSome([trimmed]);
     }
@@ -290,8 +294,8 @@ export class AutotestService {
     private async loadAutotestResultsFile(dirURI: string): Promise<string | undefined> {
         try {
             const uri = `${dirURI}/${this.AUTOTEST_RESULTS_FILENAME}`;
-            const file = await this.fileSystem.resolveContent(uri);
-            return file.content;
+            const file = await this.fileService.read(new URI(uri));
+            return file.value;
         } catch (_) {
             return undefined;
         }
@@ -333,6 +337,23 @@ export class AutotestService {
         };
 
         return program;
+    }
+
+    public async getTestPassResults(dirURI: string): Promise<{ passed: number, total: number }> {
+        const program = await this.getProgramFromAutotestResultFile(dirURI);
+
+        if(program === undefined) {
+            return {
+                passed: -1,
+                total: -1,
+            };
+        }
+
+        const testResults = program.result?.testResults ?? [];
+        const total = testResults.length;
+        const passed = testResults.filter(testResult => testResult.success).length;
+
+        return { total, passed };
     }
 
     private integerToTestResultStatus(status: number): TestResultStatus {

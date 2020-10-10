@@ -2,6 +2,7 @@ interface CourseInfo {
     id: string;
     name: string;
     abbrev: string;
+    external: boolean;
 }
 
 interface Directory {

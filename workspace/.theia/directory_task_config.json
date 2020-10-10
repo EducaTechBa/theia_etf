@@ -1,0 +1,12 @@
+{
+    "task": {
+        "run": "sleep 1s && echo \"BlaBla\""
+    },
+    "children": {
+        "UUP": {
+            "task": {
+                "run": "gcc ${file} -o ${fileDirname}/.${fileBasenameNoExtension} && ./.${fileBasenameNoExtension}"
+            }
+        }
+    }
+}

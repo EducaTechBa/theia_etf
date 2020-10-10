@@ -1,5 +1,6 @@
 import { injectable, inject } from 'inversify';
-import { FileSystem } from '@theia/filesystem/lib/common';
+import { FileService } from '@theia/filesystem/lib/browser/file-service';
+import URI from '@theia/core/lib/common/uri';
 
 @injectable()
 export class AssignmentGenerator {
@@ -7,7 +8,7 @@ export class AssignmentGenerator {
     private static readonly BASE_URL = '';
 
     constructor(
-        @inject(FileSystem) private readonly fileSystem: FileSystem,
+        @inject(FileService) private readonly fileService: FileService,
     ) {}
 
     private makeURL(url: string): string {
@@ -36,7 +37,8 @@ export class AssignmentGenerator {
         
         const data = await Promise.all(promises);
 
-        await this.fileSystem.createFolder(assignmentDirectory);
+        await this.fileService.createFolder(new URI(assignmentDirectory));
+        
 
         const filesToGenerate = data.map(file => this.generateFile(assignmentDirectory, file));
         await Promise.all(filesToGenerate);
@@ -48,9 +50,8 @@ export class AssignmentGenerator {
         }
 
         const path = `${dirURI}/${file.filename}`;
-        await this.fileSystem.createFile(path, {
-            content: file.content
-        });
+
+        await this.fileService.create(new URI(path), file.content);
     }
 
 }
