@@ -71,8 +71,15 @@ export interface HintResponse {
     tokens: number;
 }
 
+export interface SecondChanceResponse {
+    success: boolean;
+    message: string;
+    taskData: Task;
+}
+
 @injectable()
 export class GameService {
+    
 
     public async getAssignments() : Promise<Assignment[]> {
         return Promise.resolve([
@@ -223,6 +230,28 @@ export class GameService {
             };
         });
         return Promise.resolve(hintResponse);
+    }
+
+    public async useSecondChance(assignment: AssignmentDetails) : Promise<SecondChanceResponse> {
+        let secondChanceResponse = {
+            success: false,
+            message: "",
+            taskData: {
+                name: "",
+                taskNumber: 0
+            } 
+        }
+        await this.delay(10000).then( () => {
+            secondChanceResponse = {
+                success: true,
+                message: "Second chance uspio",
+                taskData: {
+                    name: "Testni zadatak 3",
+                    taskNumber: 3
+                }
+            };
+        });
+        return Promise.resolve(secondChanceResponse);
     }
 
     public async getSecondChanceAvailableTasks(assignment: AssignmentDetails) : Promise<Task[]> {

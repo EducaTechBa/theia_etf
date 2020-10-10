@@ -7,6 +7,8 @@ import { FileSystem } from '@theia/filesystem/lib/common';
 import { Assignment, PowerupType, StudentData, GameService, ChallengeConfig, AssignmentDetails} from './uup-game-service';
 import { ConfirmDialog } from '@theia/core/lib/browser';
 import { SelectDialog } from './select-dialogue';
+import { WorkspaceService } from '@theia/workspace/lib/browser';
+import URI from '@theia/core/lib/common/uri';
 
 
 interface GameInformationState {
@@ -34,6 +36,9 @@ export class UupGameViewWidget extends ReactWidget {
 
     @inject(GameService)
     protected readonly gameService!: GameService;
+
+    @inject(WorkspaceService)
+    protected readonly workspaceService: WorkspaceService;
 
     private state: GameInformationState = {
         storeOpen: false,
@@ -207,32 +212,57 @@ second chance available, choose wisely!`,
             style: {
             }
         }).open();
-        console.log(result);
-        //const confirmation = await dialog.open();
-        /*if(confirmation) {
-            this.messageService.info(`Using power-up hint for current task.`);
-            this.setState(state => {
-                let index = state.studentData.assignmentsData.findIndex( x => x.id == assignment.id );
-                if(index != -1)
-                    state.studentData.assignmentsData[index].buyingPowerUp = true;
-            });
-            const response = await this.gameService.useHint(assignment);
-            if(response.success) {
-                this.messageService.info(`Power-up 'Hint' has been used successfully.`);
-                this.messageService.info(`Hint: ${response.hint}`);
-                const index = this.state.studentData?.unusedPowerups.findIndex( (x: any) => { return x.name == 'Hint'; });
-                this.state.studentData.unusedPowerups[index].amount -= 1;
-                this.state.studentData.tokens = response.tokens;
-            } else {
-                this.messageService.error(`Using power-up 'Hint' failed.`);
+        if(!result) 
+            return;    
+        this.messageService.info(`Using power-up second chance. Returning to task ${result.name}.`);
+        this.setState(state => {
+            let index = state.studentData.assignmentsData.findIndex( x => x.id == assignment.id );
+            if(index != -1)
+                state.studentData.assignmentsData[index].buyingPowerUp = true;
+                assignment.buyingPowerUp = true;
+        });
+        //If assignment is already finished, we need to regenerate folders for it
+        if(assignment.finished) {
+            this.messageService.info(`Using 'Second Chance' power-up on finished assignment detected. Regenerating required resources.`);
+            this.generateAssignmentFiles(assignment);
+            assignment.started = true;
+            assignment.finished = false;
+        }
+        const response = await this.gameService.useSecondChance(assignment);
+        if(response.success) {
+            this.messageService.info(`Power-up 'Second Chance' has been used sucessfully.`);
+            this.messageService.info(`You are now back to task ${response.taskData.name} [Task ${response.taskData.taskNumber}].`);
+            const index = this.state.studentData?.unusedPowerups.findIndex( (x: any) => { return x.name == 'Second Chance'; });
+            this.state.studentData.unusedPowerups[index].amount -= 1;
+            //Update current task
+            assignment.currentTask = response.taskData;
+            //Update hint if existing
+        } else {
+
+        }
+        this.setState(state => {
+            let index = state.studentData.assignmentsData.findIndex( x => x.id == assignment.id );
+            if(index != -1) {
+                state.studentData.assignmentsData[index].buyingPowerUp = false;
             }
-            this.setState(state => {
-                let index = state.studentData.assignmentsData.findIndex( x => x.id == assignment.id );
-                if(index != -1)
-                    state.studentData.assignmentsData[index].buyingPowerUp = false;
-            });
-        }*/
+            assignment.buyingPowerUp = false;
+            state.studentData.assignmentsData[index] = assignment;
+        });
     }
+
+    private async generateAssignmentFiles(assignment: AssignmentDetails) {
+        const directoryExists = await this.workspaceService.containsSome([assignment.name]);
+        const workspaceURI = this.workspaceService.workspace?.resource || '';
+        const assignmentDirectoryURI = `${workspaceURI}/${assignment.name}`;
+
+        if (!directoryExists) {
+            this.messageService.info(`Generating sources for '${assignment.name}'...`);
+            await this.fileSystem.createFolder(assignmentDirectoryURI);
+            this.messageService.info(`Sources for ${assignment.name} generated successfully!`);
+        }
+
+    }
+    
     
     protected render(): React.ReactNode {
         /*
@@ -288,7 +318,7 @@ second chance available, choose wisely!`,
                 </span>
                 <span>
                     <button 
-                        disabled= { this.state.buyingPowerup }
+                        disabled= { this.state.buyingPowerup && this.state.studentData.tokens >= powerupType.price }
                         className="theia-button"
                         onClick={ () => {this.buyPowerup(powerupType)} }
                     >{powerupType.price}&nbsp;<i className="button-icon fa fa-cubes" aria-hidden="true"> </i></button>
