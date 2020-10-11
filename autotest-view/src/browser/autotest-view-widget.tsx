@@ -216,7 +216,7 @@ export class AutotestViewWidget extends ReactWidget {
                 state.progressMessage = '';
             });
 
-            const runInfo = await this.autotestService.runTests(this.state.programDirectoryURI);
+            const runInfo = await this.autotestService.runTests(this.state.programDirectoryURI, true);
             if (!runInfo.success) {
                 let message = "";
                 if (runInfo.status === AutotestRunStatus.ERROR_OPENING_DIRECTORY) {

@@ -21,6 +21,7 @@ export interface Program {
     uri: string;
     status: ProgramStatus;
     totalTests: number;
+    isUserInvoked: boolean,
     result?: Result;
 }
 
@@ -130,7 +131,7 @@ export class AutotestService {
         @inject(WorkspaceService) private readonly workspaceService: WorkspaceService,
     ) { }
 
-    public async runTests(dirURI: string): Promise<AutotestRunInfo> {
+    public async runTests(dirURI: string, isUserInvoked: boolean): Promise<AutotestRunInfo> {
         if (this.isBeingTested(dirURI)) {
             return {
                 success: false,
@@ -152,9 +153,10 @@ export class AutotestService {
 
         let program = this.getProgram(dirURI);
         if (!program) {
-            program = await this.createProgram(taskID, autotest.tests.length, dirURI);
+            program = await this.createProgram(taskID, autotest.tests.length, dirURI, isUserInvoked);
             this.state.programs[dirURI] = program;
         }
+        program.isUserInvoked = isUserInvoked;
 
         console.log(`Program ID: ${program.id}`);
 
@@ -196,13 +198,14 @@ export class AutotestService {
         };
     }
 
-    private async createProgram(taskID: string, totalTests: number, uri: string): Promise<Program> {
+    private async createProgram(taskID: string, totalTests: number, uri: string, isUserInvoked: boolean): Promise<Program> {
         const id = await this.autotester.setProgram(taskID);
         return {
             id,
             status: ProgramStatus.PROGRAM_AWAITING_TESTS,
             totalTests,
-            uri
+            uri,
+            isUserInvoked,
         };
     }
 
@@ -333,7 +336,8 @@ export class AutotestService {
             totalTests: 0,
             uri: dirURI,
             status: this.integerToProgramStatus(data.status),
-            result
+            result,
+            isUserInvoked: false,
         };
 
         return program;
