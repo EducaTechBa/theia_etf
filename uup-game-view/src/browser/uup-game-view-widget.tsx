@@ -3,7 +3,7 @@ import { injectable, postConstruct, inject } from 'inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core';
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
-import { Assignment, PowerupType, StudentData, GameService, ChallengeConfig, AssignmentDetails} from './uup-game-service';
+import { Assignment, PowerupType, StudentData, GameService, ChallengeConfig, AssignmentDetails, TaskCategory} from './uup-game-service';
 import { ConfirmDialog } from '@theia/core/lib/browser';
 import { SelectDialog } from './select-dialogue';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
@@ -12,10 +12,12 @@ import { AutotestService, AutotestEvent } from 'autotest-view/lib/browser/autote
 
 
 interface GameInformationState {
+    handlers: Record<string, boolean>
     storeOpen: boolean;
     buyingPowerup: boolean;
     assignments: Assignment[];
     powerupTypes: PowerupType[];
+    taskCategories: TaskCategory[];
     challengeConfig: ChallengeConfig;
     studentData: StudentData;
 }
@@ -42,10 +44,12 @@ export class UupGameViewWidget extends ReactWidget {
     protected readonly autotestService: AutotestService;
 
     private state: GameInformationState = {
+        handlers: {},
         storeOpen: false,
         buyingPowerup: false,
         assignments: [],
         powerupTypes: [],
+        taskCategories: [],
         challengeConfig: {
             enoughPoints: 0,
             noPowerups: 0,
@@ -73,12 +77,15 @@ export class UupGameViewWidget extends ReactWidget {
         const _assignments = await this.gameService.getAssignments();
         const _powerupTypes = await this.gameService.getPowerupTypes();
         const _challengeConfig = await this.gameService.getChallengeConfig();
-        //const _taskCategories = await this.gameService.getTaskCategories();
+        const _taskCategories = await this.gameService.getTaskCategories();
         const _studentData = await this.gameService.getStudentData(_assignments, _powerupTypes, _challengeConfig.tasksRequired);
+        const _handlers = this.generateEmptyHandlers(_assignments);
         this.setState(state => {
+            state.handlers = _handlers;
             state.assignments = _assignments;
             state.powerupTypes = _powerupTypes;
             state.challengeConfig = _challengeConfig;
+            state.taskCategories = _taskCategories;
             state.studentData = _studentData;
         });
 
@@ -88,6 +95,14 @@ export class UupGameViewWidget extends ReactWidget {
     private setState(update: (state: GameInformationState) => void) {
         update(this.state);
         this.update();
+    }
+
+    //TODO: Dodati full URI do fajla umjesto samo NAME-a
+    private generateEmptyHandlers(assignments: Assignment[]) : Record<string, boolean> {
+        assignments = assignments.filter( (x) => { return x.active;});
+        let handlers : Record<string,boolean> = {};
+        assignments.forEach( (x: Assignment) => { handlers[x.name] = false; })
+        return handlers;
     }
 
     private getPowerupAmount(powerupName: string) : number {
@@ -143,7 +158,7 @@ export class UupGameViewWidget extends ReactWidget {
             });
             const response = await this.gameService.buyPowerup(powerupType);
             if(response.success) {
-                this.messageService.info('Powerup bla bla bla has been basljdaldja');
+                this.messageService.info(`Powerup '${powerupType.name}' successfully bought.`);
                 const index = this.state.studentData?.unusedPowerups.findIndex( (x: any) => { return x.name == powerupType.name; });
                 if(index == -1)
                     this.state.studentData?.unusedPowerups.push({name: powerupType.name, amount: 1});
@@ -165,6 +180,7 @@ export class UupGameViewWidget extends ReactWidget {
     }
     //Testirati
     // TODO: dodati otvaranje postavki i odgovarajucih fajlova nakon file switch-a
+    // dodati confirmation dialog na start.
     private async startAssignment(assignment: AssignmentDetails) {
         //Call service to start asssignment and get a response
         const response = await this.gameService.startAssignment(assignment);
@@ -188,7 +204,10 @@ export class UupGameViewWidget extends ReactWidget {
             //Update assignment i update state
             assignment.started = true;
             assignment.finished = false;
-            assignment.currentTask = response.data.taskData;
+            assignment.currentTask = {
+                name: response.data.taskData.task_name,
+                taskNumber: response.data.taskData.task_number
+            }
             this.updateAssignmentState(assignment);
             //Otvoriti nove fajlove
         }        
@@ -261,39 +280,46 @@ second chance available, choose wisely!`,
             let index = state.studentData.assignmentsData.findIndex( x => x.id == assignment.id );
             if(index != -1)
                 state.studentData.assignmentsData[index].buyingPowerUp = true;
-                assignment.buyingPowerUp = true;
         });
+        let createdFolders = false;
         //If assignment is already finished, we need to regenerate folders for it
         if(assignment.finished) {
             this.messageService.info(`Using 'Second Chance' power-up on finished assignment detected. Regenerating required resources.`);
             this.generateAssignmentFiles(assignment);
             assignment.started = true;
             assignment.finished = false;
+            createdFolders = true;
         }
         const response = await this.gameService.useSecondChance(assignment);
         if(response.success) {
             this.messageService.info(`Power-up 'Second Chance' has been used sucessfully.`);
-            this.messageService.info(`You are now back to task ${response.taskData.name} [Task ${response.taskData.taskNumber}].`);
+            this.messageService.info(`You are now back to task ${response.data.task_name} [Task ${response.data.task_number}].`);
             const index = this.state.studentData?.unusedPowerups.findIndex( (x: any) => { return x.name == 'Second Chance'; });
             this.state.studentData.unusedPowerups[index].amount -= 1;
             //Update current task
-            assignment.currentTask = response.taskData;
+            assignment.currentTask = {
+                name: response.data.task_name,
+                taskNumber: response.data.task_number
+            };
+            //Set previous points in assignments state
+            assignment.previousPoints = response.data.previous_points;
             //Update hint if existing
             assignment.taskHint = "";
             const pIndex = assignment.powerupsUsed.findIndex( (x: any) => { return x.name == 'Hint' && x.taskNumber == assignment.currentTask.taskNumber });
             if( pIndex != -1) {
                 assignment.taskHint = await this.gameService.getUsedHint(assignment.id, assignment.currentTask.taskNumber);
             }
-
         } else {
             this.messageService.error(response.message);
+            if(createdFolders) {
+                this.removeAssignmentFiles(assignment);
+            }
         }
         this.setState(state => {
             let index = state.studentData.assignmentsData.findIndex( x => x.id == assignment.id );
             if(index != -1) {
                 state.studentData.assignmentsData[index].buyingPowerUp = false;
             }
-            assignment.buyingPowerUp = false;
             state.studentData.assignmentsData[index] = assignment;
         });
     }
@@ -330,6 +356,7 @@ second chance available, choose wisely!`,
                     name: response.data.taskData.task_name,
                     taskNumber: response.data.taskData.task_number
                 }
+                assignment.previousPoints = -1;
                 assignment.taskHint = "";
                 this.updateAssignmentState(assignment);
             } else {
@@ -350,19 +377,28 @@ second chance available, choose wisely!`,
         const assignmentDirectoryURI = `${workspaceURI}/${assignment.name}`;
 
         if (!directoryExists) {
-            this.messageService.info(`Generating sources for '${assignment.name}'...`);
             await this.fileService.createFolder(new URI(assignmentDirectoryURI));
-            this.messageService.info(`Sources for ${assignment.name} generated successfully!`);
         }
+    }
+    
+    private async removeAssignmentFiles(assignment: AssignmentDetails) {
+        const directoryExists = await this.workspaceService.containsSome([assignment.name]);
+        const workspaceURI = this.workspaceService.workspace?.resource || '';
+        const assignmentDirectoryURI = `${workspaceURI}/${assignment.name}`;
 
-    }    
+        if (directoryExists) {
+            await this.fileService.delete(new URI(assignmentDirectoryURI));
+        }
+    }
+
     //TODO:
     // zatvoriti i otvoriti fajlove
+    // modificirati handler u full URI
+    // dodati check da li je user invoked testiranje bilo ili ne
     private async turnInCurrentTask(assignment: AssignmentDetails) {
         const workspaceURI = this.workspaceService.workspace?.resource || '';
         //const assignmentDirectoryURI = `${workspaceURI}/${assignment.name}`;
         const assignmentDirectoryURI = `${workspaceURI}/UUP/T2/Z2`;
-        console.log("Checkpoint 1:", assignmentDirectoryURI);
 
         //dijalozi i sranja
         const dialog = new ConfirmDialog({
@@ -377,26 +413,117 @@ second chance available, choose wisely!`,
         });
         const confirmation = await dialog.open();
         if(confirmation) {
-            // pokrenuti i sacekati testiranje
-            this.messageService.info(`Starting unit testing on task ${assignment.currentTask.name}.`);
+            this.setState(state => {
+                let index = state.studentData.assignmentsData.findIndex( x => x.id == assignment.id );
+                if(index != -1)
+                    state.studentData.assignmentsData[index].buyingPowerUp = true;
+            });
+            // Pokrecemo testiranje
+            this.messageService.info(`Starting unit testing on task '${assignment.currentTask.name}'.`);
             this.autotestService.runTests(assignmentDirectoryURI);
-            console.log("Checkpoint 2: Started runTests method");
+            console.log("Checkpoint: Started runTests method");
             //Hoce li praviti problem kad se second chance vrati 
             
-            this.autotestService.onTestsFinished( async (e: AutotestEvent) => {
-                console.log("OnTestsFinished fired");
-                if(e.program.uri !== assignmentDirectoryURI)
-                    return;
-                //Ako jeste nastavi
-                let results = await this.autotestService.getTestPassResults(assignmentDirectoryURI);
-                console.log(JSON.stringify(results));
-            })
+            //Provjeramo da li vec egzistira handler za zadani assignment
+            let check = this.state.handlers[assignment.name];
+            if(!check) {
+                this.state.handlers[assignment.name] = true;
+                this.autotestService.onTestsFinished( async (e: AutotestEvent) => {
+                    console.log("OnTestsFinished fired");
+                    //TODO: dodati user invoked.
+                    if(e.program.uri !== assignmentDirectoryURI)
+                        return;
+                    //Ako jeste nastavi
+                    let tpResults = await this.autotestService.getTestPassResults(assignmentDirectoryURI);
+                    let results = {
+                        "passed_tests": tpResults.passed,
+                        "total_tests": tpResults.total
+                    }
+                    console.log(JSON.stringify(results));
+                    //Testing purposes
+                    results = {
+                        "passed_tests": 3,
+                        "total_tests": 3
+                    }
+                    const _dialog = new ConfirmDialog({
+                        title: "Task turn in confirmation",
+                        msg: `Testing task '${assignment.currentTask.name}' has
+                        been completed.\n Successful tests: ${results.passed_tests}\n Total tests: ${results.total_tests}\n
+                        Are you sure you want to turn in this task?`,
+                        ok: "Yes",
+                        cancel: "No"
+                    });
+                    const _confirmation = await _dialog.open();
+                    if(!_confirmation)
+                        return;
+                    // pozvati servis
+                    const response = await this.gameService.turnInTask(assignment);
+                    // upisati odgovarjuce podatke i setState pozvati
+                    if(response.success) {
+                        this.messageService.info(response.message);
+                        assignment.tasksTurnedIn += 1;
+                        //Update assignment and set state
+                        assignment.currentTask = {
+                            name: response.data.taskData.task_name,
+                            taskNumber: response.data.taskData.task_number
+                        };
+                        if(results.passed_tests === results.total_tests) {
+                            assignment.tasksFullyFinished += 1;
+                            if(this.state.challengeConfig.tasksRequired-assignment.tasksFullyFinished > 0)
+                                this.messageService.warn(`You need to complete ${this.state.challengeConfig.tasksRequired-assignment.tasksFullyFinished}
+                                    more task${this.state.challengeConfig.tasksRequired-assignment.tasksFullyFinished==1?'':'s'}
+                                    with all tests succeeded to unlock next assignment.Do not get locked out!`);
+                        }
+                        if(assignment.previousPoints != -1) {
+                            this.state.studentData.points -= assignment.previousPoints;
+                            assignment.points -= assignment.previousPoints;
+                            assignment.previousPoints = -1;
+                        }
+                        assignment.points += response.data.points;
+                        this.state.studentData.points += response.data.points;
+                        this.state.studentData.tokens += response.data.tokens;
+                        //Checking for additional tokens
+                        let _additionalTokens = response.data.additionalTokens;
+                        //Showing shit for used
+                        this.messageService.info(`You earned ${response.data.points*1000} XP and ${response.data.tokens} tokens.`);
+                        if(Object.keys(_additionalTokens).length !== 0 && _additionalTokens.constructor === Object) {
+                            this.messageService.info(`Congratulations! You earned additional ${_additionalTokens.amount} tokens.
+                            Reason: ${_additionalTokens.reason}`)
+                            this.state.studentData.tokens += _additionalTokens.amount;
+                        }
+                        if(response.data.assignmentDone) {
+                            assignment.finished = true;
+                            assignment.tasksTurnedIn = 15;
+                            this.messageService.info(`Congratulations! You have completed all tasks in assignment '${assignment.name}.'`);
+                            this.removeAssignmentFiles(assignment);
+                        }
+                        assignment.taskHint = "";
+                        this.updateAssignmentState(assignment);
+                    } else {
+                        this.messageService.error(response.message);
+                    }
+                    // otvoriti novi task
+                    this.setState(state => {
+                        let index = state.studentData.assignmentsData.findIndex( x => x.id == assignment.id );
+                        if(index != -1)
+                            state.studentData.assignmentsData[index].buyingPowerUp = false;
+                        state.studentData = this.state.studentData;
+                    });
+                });
+                //Do I need to do this?
+                /*this.setState(state => {
+                    state.handlers = this.state.handlers;
+                })*/
+            }
         }
        
-        // pozvati servis
-        //const response = await this.gameService.turnInTask(assignment);
-        // upisati odgovarjuce podatke i setState pozvati
-        // otvoriti novi task
+     
+    }
+
+    private getTotalTasks() : number {
+        let sum = 0;
+        this.state.taskCategories.forEach( (x: TaskCategory) => { sum += x.tasks_per_category; });
+        return sum;
     }
     
     
@@ -446,7 +573,7 @@ second chance available, choose wisely!`,
                 </span>
                 <span>
                     <button 
-                        disabled= { this.state.buyingPowerup && this.state.studentData.tokens >= powerupType.price }
+                        disabled= { this.state.buyingPowerup || this.state.studentData.tokens < powerupType.price }
                         className="theia-button"
                         onClick={ () => {this.buyPowerup(powerupType)} }
                     >{powerupType.price}&nbsp;<i className="button-icon fa fa-cubes" aria-hidden="true"> </i></button>
@@ -462,12 +589,17 @@ second chance available, choose wisely!`,
         let level = Math.floor(points) + 1;
         let progress : number = (points - Math.floor(points))*100;
         let xp = Math.floor(progress * 10);
+        if(Math.abs(points - 30) < 0.0001 ) {
+            level = 30;
+            progress = 100;
+            xp = 1000;
+        }
         return <div className='student-info'>
             <span className="student-header">{header}</span>
             <span className="student-level">Level: {level}</span>
             <div className="progress-bar">
-                    <span className="progress-bar-span">{progress}</span>
-                    <div className="progress-bar-xp" style={{width: `${progress}%`}}></div>
+                    <span className="progress-bar-span">{progress.toFixed(2)}%</span>
+                    <div className="progress-bar-xp" style={{width: `${progress.toFixed(2)}%`}}></div>
             </div>
             <span className="student-xp">XP: {xp}/1000</span>
             {this.renderPowerupStatus()}
@@ -476,35 +608,37 @@ second chance available, choose wisely!`,
 
     private renderPowerupStatus() : React.ReactNode {
         return <table className="powerups-table">
-            <tr>
-                <td><i className="fa fa-lightbulb-o" aria-hidden="true"></i></td>
-                <td><i className="fa fa-undo" aria-hidden="true"></i></td>
-                <td><i className="fa fa-exchange" aria-hidden="true"></i></td>
-                <td><i className="fa fa-cubes" aria-hidden="true"></i></td>
-            </tr>
-            <tr>
-                <td>{this.getPowerupAmount('Hint')}</td>
-                <td>{this.getPowerupAmount('Second Chance')}</td>
-                <td>{this.getPowerupAmount('Switch Task')}</td>
-                <td>{this.state.studentData?.tokens}</td>
-            </tr>
+            <tbody>
+                <tr>
+                    <td><i className="fa fa-lightbulb-o" aria-hidden="true"></i></td>
+                    <td><i className="fa fa-undo" aria-hidden="true"></i></td>
+                    <td><i className="fa fa-exchange" aria-hidden="true"></i></td>
+                    <td><i className="fa fa-cubes" aria-hidden="true"></i></td>
+                </tr>
+                <tr>
+                    <td>{this.getPowerupAmount('Hint')}</td>
+                    <td>{this.getPowerupAmount('Second Chance')}</td>
+                    <td>{this.getPowerupAmount('Switch Task')}</td>
+                    <td>{this.state.studentData?.tokens}</td>
+                </tr>
+            </tbody>
         </table>
     }  
 
-    private renderHint(hint: string) : React.ReactNode {
+    private renderAlertBox(type: string, icon: string, header: string, message: string) : React.ReactNode {
 
         return <div className='theia-alert-message-container'>
-            <div className={`theia-info-alert`}>
+            <div className={`theia-${type.toLowerCase()}-alert`}>
                 <div className='theia-message-header'>
-                    <i className='INFO'></i>&nbsp;
-                    Hint for current task
+                    <i className={`${icon}`}></i>&nbsp;
+                    {header}
                 </div>
-                <div className='theia-message-content'>{hint}</div>
+                <div className='theia-message-content'>{message}</div>
             </div>
         </div>;
     
     }
-    
+    //TODO:
     private renderAssignmentDetails(assignment: AssignmentDetails) : React.ReactNode {
         let content: React.ReactNode;
         if(!assignment.unlocked) {
@@ -531,8 +665,8 @@ second chance available, choose wisely!`,
             </div>
         }
         else if(!assignment.finished) {
-            let percent = ((assignment.tasksTurnedIn/15)*100).toFixed(2);
-            //(Math.round(maxPointsPct * assignmentMaxPoints*100)/100).toFixed(2);           
+            let totalTasks = this.getTotalTasks();
+            let percent = ((assignment.tasksTurnedIn/totalTasks)*100).toFixed(2);         
             content = 
             <div>
                 <span className="assignment-progress">Assignment Progress</span>
@@ -541,30 +675,36 @@ second chance available, choose wisely!`,
                     <div className="progress-bar-green" style={{width: `${percent}%`}}></div>
                 </div>
                 <div className="assignment-content">
-                    <span className="span">Total tasks: 15</span>
+                    <span className="span">Total tasks: {totalTasks}</span>
                     <span className="span">Tasks turned in: {assignment.tasksTurnedIn}</span>
                     <span className="span">Tasks fully finished: {assignment.tasksFullyFinished}</span>
                     <span className="span">Current task: {assignment.currentTask.taskNumber}</span>
                     <span className="span">Task name: {assignment.currentTask.name}</span> 
+                    <div className={`collapse ${ assignment.tasksFullyFinished<this.state.challengeConfig.tasksRequired ? ' in' : ''}`}>
+                        {this.renderAlertBox('warning', 'fa fa-exclamation-circle', 'Warning',
+                        `You need to complete ${this.state.challengeConfig.tasksRequired-assignment.tasksFullyFinished}
+                        more task${this.state.challengeConfig.tasksRequired-assignment.tasksFullyFinished==1?'':'s'}
+                        with all tests succeeded to unlock next assignment.Do not get locked out!`)}
+                    </div>
                     <div className={`collapse ${ assignment.taskHint != "" ? ' in' : ''}`}>
-                        {this.renderHint(assignment.taskHint)}
+                        {this.renderAlertBox('info', 'fa fa-info-circle', 'Hint for current task', assignment.taskHint)}
                     </div>
                 </div>
                 <div className="powerups-buttons">
                     <button 
-                        disabled= { assignment.buyingPowerUp }
+                        disabled= { assignment.buyingPowerUp || !(this.getPowerupAmount('Hint') > 0) }
                         className="theia-button powerup-button"
                          onClick={ () => {this.useHintPowerup(assignment)} }>
                         <i className="fa fa-lightbulb-o" aria-hidden="true"></i>
                     </button>
                     <button 
-                        disabled= { assignment.buyingPowerUp }
+                        disabled= { assignment.buyingPowerUp || !(this.getPowerupAmount('Second Chance') > 0) }
                         className="theia-button powerup-button"
                         onClick = { () => {this.useSecondChancePowerup(assignment)} } >
                         <i className="fa fa-undo" aria-hidden="true"></i>
                     </button>
                     <button 
-                        disabled= { assignment.buyingPowerUp }
+                        disabled= { assignment.buyingPowerUp || !(this.getPowerupAmount('Switch Task') > 0) }
                         className="theia-button powerup-button"
                         onClick = { () => {this.useSwitchTaskPowerup(assignment)} } >
                         <i className="fa fa-exchange" aria-hidden="true"></i>
@@ -588,7 +728,13 @@ second chance available, choose wisely!`,
                 'Second Chance' you have another shot at completing one task in this assignment
                 which you didn't fully finish. Choose wisely!
                 </span>
-                <button className="theia-button af-second-chance-button"><i className="fa fa-undo" aria-hidden="true"></i>&nbsp;Second Chance</button>
+                <button 
+                    disabled = { !(this.getPowerupAmount('Second Chance') > 0) }
+                    className="theia-button af-second-chance-button"
+                    onClick = { () => {this.useSecondChancePowerup(assignment)} } >
+                    <i className="fa fa-undo" aria-hidden="true"></i>
+                    &nbsp;Second Chance
+                </button>
             </div>
         }
         return <li
@@ -611,11 +757,5 @@ second chance available, choose wisely!`,
         this.messageService.info('Congratulations: UupGameView Widget Successfully Created!');
     }
 
-    /*
-    Implementirati: 
-    Upozorenje o otkljucavanju iduceg assignment-a
-
-    Popraviti level/progress
-    */
 }
   

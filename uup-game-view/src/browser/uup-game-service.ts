@@ -25,6 +25,14 @@ export interface Assignment {
     challenge_pts: number;
 }
 
+export interface TaskCategory {
+    id: number;
+    name: string;
+    points_percent: number;
+    tokens: number;
+    tasks_per_category: number;
+}
+
 export interface AssignmentDetails {
     id: number;
     name: string;
@@ -33,6 +41,7 @@ export interface AssignmentDetails {
     finished: boolean;
     tasksFullyFinished: number;
     tasksTurnedIn: number;
+    previousPoints: number;
     points: number;
     currentTask: Task;
     taskHint: string;
@@ -75,7 +84,7 @@ export interface HintResponse {
 export interface SecondChanceResponse {
     success: boolean;
     message: string;
-    taskData: Task;
+    taskData: {};
 }
 
 export interface ServerResponse {
@@ -165,37 +174,36 @@ export class GameService {
     }
 
     public async getPowerupTypes() : Promise<PowerupType[]> {
-        return Promise.resolve([
-            {
-                "id": 1,
-                "name": "Hint",
-                "price": 60
-            },
-            {
-                "id": 2,
-                "name": "Second Chance",
-                "price": 100
-            },
-            {
-                "id": 3,
-                "name": "Switch Task",
-                "price": 140
-            }
-        ]);
+        let requestURL = this.BASE_URL +`getPowerUpTypes`;
+        let res = await fetch(requestURL, {
+            method: "GET",
+            credentials: "include"
+        });
+        let data = await res.json();
+        console.log("Powerup type data received: " + JSON.stringify(data));
+        return Promise.resolve(data.data);
     }
 
     public async getChallengeConfig() : Promise<ChallengeConfig> {
-        return Promise.resolve({
-            enoughPoints: 60,
-            noPowerups: 100,
-            maxPoints: 140,
-            maxPointsNoPowerups: 300,
-            tasksRequired: 5
-        })
+        let requestURL = this.BASE_URL +`getChallengeConfig`;
+        let res = await fetch(requestURL, {
+            method: "GET",
+            credentials: "include"
+        });
+        let data = await res.json();
+        console.log("Challenge cfg data received: " + JSON.stringify(data));
+        return Promise.resolve(data.data);
     }
 
-    public async getTaskCategories() : Promise<void> {
-        return Promise.resolve();
+    public async getTaskCategories() : Promise<TaskCategory[]> {
+        let requestURL = this.BASE_URL +`getTaskCategories`;
+        let res = await fetch(requestURL, {
+            method: "GET",
+            credentials: "include"
+        });
+        let data = await res.json();
+        console.log("Task Categories data received: " + JSON.stringify(data));
+        return Promise.resolve(data.data);
     }
 
     private async delay(ms: number) {
@@ -203,7 +211,6 @@ export class GameService {
     }
 
     private mapResponse(serverResponse: any) : ServerResponse  {
-        console.log("NEKI LOG: ", JSON.stringify(serverResponse));
         let response = {
             success: false,
             message: "",
@@ -279,22 +286,24 @@ export class GameService {
         return Promise.resolve(hintResponse);
     }
 
-    public async useSecondChance(assignment: AssignmentDetails) : Promise<SecondChanceResponse> {
+    public async useSecondChance(assignment: AssignmentDetails) : Promise<ServerResponse> {
         let secondChanceResponse = {
             success: false,
             message: "",
-            taskData: {
-                name: "",
-                taskNumber: 0
+            data: {
+                task_name: "",
+                task_number: 0,
+                previous_points: -1
             } 
         }
         await this.delay(5000).then( () => {
             secondChanceResponse = {
                 success: true,
                 message: "Second chance uspio",
-                taskData: {
-                    name: "Testni zadatak 3",
-                    taskNumber: 3
+                data: {
+                    task_name: "Testni zadatak 3",
+                    task_number: 3,
+                    previous_points: 0.15
                 }
             };
         });
@@ -318,14 +327,17 @@ export class GameService {
         return Promise.resolve({
             success:true,
             message: "Current task for student mmesihovic1 in given assignment has been been turned in successfully.",
-            data: {
-                "assignmentDone": false,
+            data:  {
+                "assignmentDone": true,
                 "points": 0.2,
                 "tokens": 20,
-                "additionalTokens": {},
+                "additionalTokens": {
+                    "amount": 140,
+                    "reason": "You have completed assignment with maximum points."
+                },
                 "taskData": {
-                    "task_number": 7,
-                    "task_name": "Task 142"
+                    "task_number": -1,
+                    "task_name": "Assignment finished"
                 }
             }
         })
@@ -411,7 +423,7 @@ export class GameService {
                 },
                 {
                     "assignment_id": 2,
-                    "completed": "7"
+                    "completed": "3"
                 }
             ],
             "turnedInTasks": [
@@ -430,7 +442,7 @@ export class GameService {
             tokens: data.tokens,
             points: this.mapPoints(data),
             unusedPowerups: this.mapUnusedPowerupData(data.powerups, powerupTypes),
-            assignmentsData: this.mapAssignmentDetails(data, assignments, powerupTypes, taskRequirement)
+            assignmentsData: await this.mapAssignmentDetails(data, assignments, powerupTypes, taskRequirement)
         }
         console.log("Student Data: ", studentData);
         return Promise.resolve(studentData);
@@ -481,10 +493,21 @@ export class GameService {
         return Promise.resolve("Neki testni hint koji sam vec koristio");
     }
 
-    private mapAssignmentDetails(data : any, assignmentsData: Assignment[], powerupTypes: PowerupType[], taskRequirement: number): AssignmentDetails[] {
+    public async getPreviousPoints(assignment_id : number, taskNumber: number) : Promise<number> {
+        /*let requestURL = this.BASE_URL + `getTaskPreviousPoints&assignment_id=${assignment.id}&task_number=${assignment.currentTask.taskNumber}`;
+        let res = await fetch(requestURL, {
+            method: "GET",
+            credentials: "include",
+        });
+        let data = await res.json();
+        return Promise.resolve(data.data.points); */
+        return Promise.resolve(0.15);
+    }
+
+    private async mapAssignmentDetails(data : any, assignmentsData: Assignment[], powerupTypes: PowerupType[], taskRequirement: number): Promise<AssignmentDetails[]> {
         let assignments: AssignmentDetails[] = [];
         assignmentsData = assignmentsData.filter( (x) => { return x.active;});
-        assignmentsData.forEach( async (assignment) => {
+        for(const assignment of assignmentsData) {
             let index = data.assignmentProgress.findIndex( (x: any) => { return x.assignment_id == assignment.id; } );
             if(index != -1) {
                 let _index = data.currentTasks.findIndex( (x: any) => { return x.assignment_id == assignment.id; } );
@@ -493,12 +516,19 @@ export class GameService {
                 let _tiIndex = data.turnedInTasks.findIndex( (x: any) => { return x.assignment_id == assignment.id; });
                 let powerupsUsedData = this.mapUsedPowerupData(data.powerups, powerupTypes, assignment.id);
                 let hint = "";
+                let previousPoints = -1;
                 if(_index != -1) {
                     let _tnIndex = powerupsUsedData.findIndex( (x: any) => { return x.name == 'Hint' && x.taskNumber == data.currentTasks[_index].task_number });
                     if(_tnIndex != -1) {
                         //Posalji request da dobijes hint
                         let usedHint = await this.getUsedHint(assignment.id, data.currentTasks[_index].task_number);
                         hint = usedHint;
+                    }
+                    let _scIndex = powerupsUsedData.findIndex( (x: any) => { return x.name == 'Second Chance' && x.taskNumber == data.currentTasks[_index].task_number });
+                    if(_scIndex != -1) {
+                        //Posalji request da dobijes previous poene
+                        let _previousPoints = await this.getPreviousPoints(assignment.id, data.currentTasks[_index].task_number);
+                        previousPoints = _previousPoints;
                     }
                 }
                 let _assignmentDetails : AssignmentDetails = {
@@ -507,10 +537,11 @@ export class GameService {
                     unlocked: true,
                     started: true,
                     finished: data.assignmentProgress[index].status == "Completed",
-                    tasksFullyFinished: data.completedTasks[_ffIndex].completed,
-                    tasksTurnedIn: data.turnedInTasks[_tiIndex].turned_in,
+                    tasksFullyFinished: parseInt(data.completedTasks[_ffIndex].completed),
+                    tasksTurnedIn: parseInt(data.turnedInTasks[_tiIndex].turned_in),
+                    previousPoints: previousPoints,
                     points: data.assignmentPoints[_pIndex].points,
-                    currentTask: (_index == -1) ? {name:"-1", taskNumber: -1} : {
+                    currentTask: (_index == -1) ? {name:"Loading", taskNumber: -1} : {
                         name: data.currentTasks[_index].task_name,
                         taskNumber: data.currentTasks[_index].task_number
                     },
@@ -529,8 +560,9 @@ export class GameService {
                     finished: false,
                     tasksFullyFinished: 0,
                     tasksTurnedIn: 0,
+                    previousPoints: -1,
                     points: 0,
-                    currentTask: {name:"-1", taskNumber: -1},
+                    currentTask: {name:"Loading", taskNumber: -1},
                     taskHint: "",
                     buyingPowerUp: false,
                     powerupsUsed: [],
@@ -538,11 +570,12 @@ export class GameService {
                 }
                 assignments.push(_assignmentDetails);
             }
-        });
+        }
         assignments[0].unlocked = true;
         for(let i=1;i<assignments.length;i++)
             assignments[i].unlocked = (assignments[i-1].tasksFullyFinished >= taskRequirement);
-        return assignments.sort( (a,b) => a.id - b.id );
+        assignments.sort( (a,b) => a.id - b.id );
+        return assignments;
     }
 
 }
