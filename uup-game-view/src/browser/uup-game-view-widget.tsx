@@ -1,14 +1,14 @@
 import * as React from 'react';
 import { injectable, postConstruct, inject } from 'inversify';
-import { AlertMessage } from '@theia/core/lib/browser/widgets/alert-message';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core';
-import { FileSystem } from '@theia/filesystem/lib/common';
+import { FileService } from '@theia/filesystem/lib/browser/file-service';
 import { Assignment, PowerupType, StudentData, GameService, ChallengeConfig, AssignmentDetails} from './uup-game-service';
 import { ConfirmDialog } from '@theia/core/lib/browser';
 import { SelectDialog } from './select-dialogue';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
 import URI from '@theia/core/lib/common/uri';
+import { AutotestService, AutotestEvent } from 'autotest-view/lib/browser/autotest-service';
 
 
 interface GameInformationState {
@@ -20,8 +20,6 @@ interface GameInformationState {
     studentData: StudentData;
 }
 
-
-
 @injectable()
 export class UupGameViewWidget extends ReactWidget {
 
@@ -31,14 +29,17 @@ export class UupGameViewWidget extends ReactWidget {
     @inject(MessageService)
     protected readonly messageService!: MessageService;
 
-    @inject(FileSystem)
-    protected readonly fileSystem!: FileSystem;
+    @inject(FileService)
+    protected readonly fileService!: FileService;
 
     @inject(GameService)
     protected readonly gameService!: GameService;
 
     @inject(WorkspaceService)
     protected readonly workspaceService: WorkspaceService;
+
+    @inject(AutotestService)
+    protected readonly autotestService: AutotestService;
 
     private state: GameInformationState = {
         storeOpen: false,
@@ -114,6 +115,17 @@ export class UupGameViewWidget extends ReactWidget {
             state.storeOpen = !this.state.storeOpen;
         });
     }
+
+    private updateAssignmentState(assignment: AssignmentDetails) {
+        const index = this.state.studentData.assignmentsData.findIndex( x => x.id == assignment.id);
+        if(index == -1)
+            return;
+        this.state.studentData.assignmentsData[index] = assignment;
+        this.setState(state => {
+            state.studentData = this.state.studentData;
+        });
+    }
+
     //Testirati
     private async buyPowerup(powerupType: PowerupType) {
         //Confirmation window
@@ -151,6 +163,36 @@ export class UupGameViewWidget extends ReactWidget {
             });
         }
     }
+    //Testirati
+    // TODO: dodati otvaranje postavki i odgovarajucih fajlova nakon file switch-a
+    private async startAssignment(assignment: AssignmentDetails) {
+        //Call service to start asssignment and get a response
+        const response = await this.gameService.startAssignment(assignment);
+        //U zavisnosti od responsea izbacit message
+        if(!response.success) {
+            console.log(JSON.stringify(response));
+            debugger;
+            this.messageService.error(response.message);
+        } else {
+            const directoryExists = await this.workspaceService.containsSome([assignment.name]);
+            const workspaceURI = this.workspaceService.workspace?.resource || '';
+            const assignmentDirectoryURI = `${workspaceURI}/${assignment.name}`;
+            //Create directory if it does not exist
+            if (!directoryExists) {
+                this.messageService.info(`Generating sources for '${assignment.name}'...`);
+                await this.fileService.createFolder(new URI(assignmentDirectoryURI));
+                this.messageService.info(`Sources for '${assignment.name}' generated successfully!`);
+            } else {
+                this.messageService.error(`Resources for '${assignment.name}' already exist.`);
+            }   
+            //Update assignment i update state
+            assignment.started = true;
+            assignment.finished = false;
+            assignment.currentTask = response.data.taskData;
+            this.updateAssignmentState(assignment);
+            //Otvoriti nove fajlove
+        }        
+    }
     
     //Testirati
     private async useHintPowerup(assignment: AssignmentDetails) {
@@ -173,10 +215,14 @@ export class UupGameViewWidget extends ReactWidget {
             const response = await this.gameService.useHint(assignment);
             if(response.success) {
                 this.messageService.info(`Power-up 'Hint' has been used successfully.`);
-                this.messageService.info(`Hint: ${response.hint}`);
+                this.messageService.info(`Hint: ${response.data.hint}`);
+                let hint = response.data.hint;
                 const index = this.state.studentData?.unusedPowerups.findIndex( (x: any) => { return x.name == 'Hint'; });
                 this.state.studentData.unusedPowerups[index].amount -= 1;
-                this.state.studentData.tokens = response.tokens;
+                //Update assignmentDetails
+                assignment.taskHint = hint;
+                assignment.powerupsUsed.push({name: "Hint", taskNumber: assignment.currentTask.taskNumber});
+                this.updateAssignmentState(assignment);
             } else {
                 this.messageService.error(`Using power-up 'Hint' failed.`);
             }
@@ -186,18 +232,14 @@ export class UupGameViewWidget extends ReactWidget {
                     state.studentData.assignmentsData[index].buyingPowerUp = false;
             });
         }
+
     }
 
     //Testirati
+    //TODO: rijesiti problem sa poenima prilikom vracanja nazad.
+    // zatvoriti i otvoriti fajlove u editoru.
     private async useSecondChancePowerup(assignment: AssignmentDetails) {
-        /*/const dialog = new ConfirmDialog({
-            title: "Use power-up confirmation",
-            msg: `Are you sure you want to use powerup 'Second Chance' and move to another task in this assignment?
-            All your current progress on this task will be saved. You can only return to a specific task once. Choose wisely!`,
-            ok: "Yes",
-            cancel: "No"
-        });
-*/
+
         const tasks = await this.gameService.getSecondChanceAvailableTasks(assignment);
         const result = await new SelectDialog({
             items: tasks,
@@ -207,7 +249,7 @@ export class UupGameViewWidget extends ReactWidget {
 You can only return to tasks you haven't fully finished. All 
 progress on current task will be saved. You can only return to 
 specific task once, if you make changes you need to turn it in
-before using this power-up again. Below is a list of tasks with
+before using this power-up again, else all progress will be lost. Below is a list of tasks with
 second chance available, choose wisely!`,
             style: {
             }
@@ -237,8 +279,14 @@ second chance available, choose wisely!`,
             //Update current task
             assignment.currentTask = response.taskData;
             //Update hint if existing
-        } else {
+            assignment.taskHint = "";
+            const pIndex = assignment.powerupsUsed.findIndex( (x: any) => { return x.name == 'Hint' && x.taskNumber == assignment.currentTask.taskNumber });
+            if( pIndex != -1) {
+                assignment.taskHint = await this.gameService.getUsedHint(assignment.id, assignment.currentTask.taskNumber);
+            }
 
+        } else {
+            this.messageService.error(response.message);
         }
         this.setState(state => {
             let index = state.studentData.assignmentsData.findIndex( x => x.id == assignment.id );
@@ -250,6 +298,52 @@ second chance available, choose wisely!`,
         });
     }
 
+    //Testirati
+    // TODO: 
+    // ZATVORI sve fajlove otvorene iz current open tabs
+    // Otvori nove nakon responsea
+    private async useSwitchTaskPowerup(assignment: AssignmentDetails) {
+        const dialog = new ConfirmDialog({
+            title: "Use power-up confirmation",
+            msg: `Are you sure you want to use powerup 'Switch Task' on current task in this assignment?
+            This will result in new task being selected from tasks database and assigned to you.`,
+            ok: "Yes",
+            cancel: "No"
+        });
+        const confirmation = await dialog.open();
+        if(confirmation) {
+            this.messageService.info(`Using power-up 'Switch Task' for current task.`);
+            this.setState(state => {
+                let index = state.studentData.assignmentsData.findIndex( x => x.id == assignment.id );
+                if(index != -1)
+                    state.studentData.assignmentsData[index].buyingPowerUp = true;
+            });
+            const response = await this.gameService.switchTask(assignment);
+            if(response.success) {
+                this.messageService.info(`Power-up 'Switch Task' has been used successfully. New task files are now in your workspace. Good luck!`);
+                const index = this.state.studentData?.unusedPowerups.findIndex( (x: any) => { return x.name == 'Switch Task'; });
+                this.state.studentData.unusedPowerups[index].amount -= 1;
+                this.state.studentData.tokens = response.data?.tokens;
+                //Update current assignment
+                assignment.powerupsUsed.push({name: "Switch Task", taskNumber: assignment.currentTask.taskNumber}); 
+                assignment.currentTask = {
+                    name: response.data.taskData.task_name,
+                    taskNumber: response.data.taskData.task_number
+                }
+                assignment.taskHint = "";
+                this.updateAssignmentState(assignment);
+            } else {
+                this.messageService.error(response.message);
+            }
+            this.setState(state => {
+                let index = state.studentData.assignmentsData.findIndex( x => x.id == assignment.id );
+                if(index != -1)
+                    state.studentData.assignmentsData[index].buyingPowerUp = false;
+            });
+        }
+
+    }
+
     private async generateAssignmentFiles(assignment: AssignmentDetails) {
         const directoryExists = await this.workspaceService.containsSome([assignment.name]);
         const workspaceURI = this.workspaceService.workspace?.resource || '';
@@ -257,22 +351,56 @@ second chance available, choose wisely!`,
 
         if (!directoryExists) {
             this.messageService.info(`Generating sources for '${assignment.name}'...`);
-            await this.fileSystem.createFolder(assignmentDirectoryURI);
+            await this.fileService.createFolder(new URI(assignmentDirectoryURI));
             this.messageService.info(`Sources for ${assignment.name} generated successfully!`);
         }
 
+    }    
+    //TODO:
+    // zatvoriti i otvoriti fajlove
+    private async turnInCurrentTask(assignment: AssignmentDetails) {
+        const workspaceURI = this.workspaceService.workspace?.resource || '';
+        //const assignmentDirectoryURI = `${workspaceURI}/${assignment.name}`;
+        const assignmentDirectoryURI = `${workspaceURI}/UUP/T2/Z2`;
+        console.log("Checkpoint 1:", assignmentDirectoryURI);
+
+        //dijalozi i sranja
+        const dialog = new ConfirmDialog({
+            title: "Task turn in confirmation",
+            msg: `Are you sure you want to turn in current task in this assignment?
+            This action will automatically close tabs related to this task and run tests on current task. Testing
+            can last a while depending on server load. While this action lasts, you can work on another assignment
+            or wait for notification that task has been turned in successfully and work on a new task. Task description
+            will be opened in new tab.`,
+            ok: "Yes",
+            cancel: "No"
+        });
+        const confirmation = await dialog.open();
+        if(confirmation) {
+            // pokrenuti i sacekati testiranje
+            this.messageService.info(`Starting unit testing on task ${assignment.currentTask.name}.`);
+            this.autotestService.runTests(assignmentDirectoryURI);
+            console.log("Checkpoint 2: Started runTests method");
+            //Hoce li praviti problem kad se second chance vrati 
+            
+            this.autotestService.onTestsFinished( async (e: AutotestEvent) => {
+                console.log("OnTestsFinished fired");
+                if(e.program.uri !== assignmentDirectoryURI)
+                    return;
+                //Ako jeste nastavi
+                let results = await this.autotestService.getTestPassResults(assignmentDirectoryURI);
+                console.log(JSON.stringify(results));
+            })
+        }
+       
+        // pozvati servis
+        //const response = await this.gameService.turnInTask(assignment);
+        // upisati odgovarjuce podatke i setState pozvati
+        // otvoriti novi task
     }
     
     
-    protected render(): React.ReactNode {
-        /*
-        const header = `This is a sample widget which simply calls the messageService
-        in order to display an info message to end users.`;
-        return <div id='widget-container'>
-            <AlertMessage type='INFO' header={header} />
-            <button className='theia-button secondary' title='Display Message' onClick={_a => this.displayMessage()}>Display Message</button>
-        </div>
-        */        
+    protected render(): React.ReactNode {  
         return <div id='uup-game-container'>
             {this.renderGeneralStudentInfo(this.state.studentData)}
             <ul className="assignments-list">
@@ -362,6 +490,20 @@ second chance available, choose wisely!`,
             </tr>
         </table>
     }  
+
+    private renderHint(hint: string) : React.ReactNode {
+
+        return <div className='theia-alert-message-container'>
+            <div className={`theia-info-alert`}>
+                <div className='theia-message-header'>
+                    <i className='INFO'></i>&nbsp;
+                    Hint for current task
+                </div>
+                <div className='theia-message-content'>{hint}</div>
+            </div>
+        </div>;
+    
+    }
     
     private renderAssignmentDetails(assignment: AssignmentDetails) : React.ReactNode {
         let content: React.ReactNode;
@@ -381,13 +523,16 @@ second chance available, choose wisely!`,
                 by completing tasks, earning experience points and tokens which will
                 allow you to buy power-ups to help you throughout the game.
                 </span>
-                <button className="theia-button start-assignment-button">Start Assignment</button>
+                <button 
+                className="theia-button start-assignment-button"
+                onClick = { () => {this.startAssignment(assignment)}}>
+                    Start Assignment
+                </button>
             </div>
         }
         else if(!assignment.finished) {
             let percent = ((assignment.tasksTurnedIn/15)*100).toFixed(2);
-            let hintContent = 'This is placeholder hint content.';
-            //(Math.round(maxPointsPct * assignmentMaxPoints*100)/100).toFixed(2);
+            //(Math.round(maxPointsPct * assignmentMaxPoints*100)/100).toFixed(2);           
             content = 
             <div>
                 <span className="assignment-progress">Assignment Progress</span>
@@ -401,7 +546,9 @@ second chance available, choose wisely!`,
                     <span className="span">Tasks fully finished: {assignment.tasksFullyFinished}</span>
                     <span className="span">Current task: {assignment.currentTask.taskNumber}</span>
                     <span className="span">Task name: {assignment.currentTask.name}</span> 
-                    <AlertMessage type='INFO' header={hintContent} />
+                    <div className={`collapse ${ assignment.taskHint != "" ? ' in' : ''}`}>
+                        {this.renderHint(assignment.taskHint)}
+                    </div>
                 </div>
                 <div className="powerups-buttons">
                     <button 
@@ -419,7 +566,7 @@ second chance available, choose wisely!`,
                     <button 
                         disabled= { assignment.buyingPowerUp }
                         className="theia-button powerup-button"
-                        onClick = { () => {} } >
+                        onClick = { () => {this.useSwitchTaskPowerup(assignment)} } >
                         <i className="fa fa-exchange" aria-hidden="true"></i>
                     </button>
                 </div>
@@ -427,7 +574,7 @@ second chance available, choose wisely!`,
                     <button 
                         disabled= { assignment.buyingPowerUp }
                         className="theia-button powerup-button-turn-in"
-                         onClick={ () => {} }>
+                        onClick = { () => { this.turnInCurrentTask(assignment)} } >
                         <i className="fa fa-file-text" aria-hidden="true"></i>
                         &nbsp;Turn current task in
                     </button>
@@ -466,10 +613,8 @@ second chance available, choose wisely!`,
 
     /*
     Implementirati: 
-    -Buy / Turn-in / Powerup-e
-    -Start assignment / second chance na zatvoren assignment.
     Upozorenje o otkljucavanju iduceg assignment-a
-    Prikaz hinta na zadatku gdje je vec bio
+
     Popraviti level/progress
     */
 }
