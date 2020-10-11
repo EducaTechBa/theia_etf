@@ -4,13 +4,14 @@ import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core';
 import { EditorManager, EditorWidget } from '@theia/editor/lib/browser';
 import { FileSystem } from '@theia/filesystem/lib/common';
-import { AutotestService, AutotestRunStatus, Program, TestResult } from './autotest-service';
+import { AutotestService, AutotestRunStatus, Program, TestResult, AutotestCancelStatus } from './autotest-service';
 
 interface AutotestWidgetState {
     programDirectoryURI: string | undefined;
     autotestResults: TestResult[];
     statusMessage: string;
     progressMessage: string;
+    isRunningTests: boolean;
 }
 
 @injectable()
@@ -24,6 +25,7 @@ export class AutotestViewWidget extends ReactWidget {
         autotestResults: [],
         statusMessage: '',
         progressMessage: '',
+        isRunningTests: false
     };
 
     @inject(MessageService)
@@ -83,6 +85,7 @@ export class AutotestViewWidget extends ReactWidget {
             state.statusMessage = statusMessage;
             state.progressMessage = isBeingTested ? completionMessage : queueMessage;
             state.autotestResults = [];
+            state.isRunningTests = true;
         });
     }
 
@@ -102,6 +105,7 @@ export class AutotestViewWidget extends ReactWidget {
             state.statusMessage = program.status.toString();
             state.progressMessage = '';
             state.autotestResults = program.result?.testResults ?? [];
+            state.isRunningTests = false;
         });
     }
 
@@ -140,6 +144,7 @@ export class AutotestViewWidget extends ReactWidget {
                 state.autotestResults = [];
                 state.statusMessage = 'No autotests defined.';
                 state.progressMessage = '';
+                state.isRunningTests = false;
             });
             return;
         }
@@ -151,9 +156,9 @@ export class AutotestViewWidget extends ReactWidget {
         return <div id='autotests-container'>
             <button
                 className="theia-button run-tests-button"
-                onClick={() => this.handleRunTests()}
+                onClick={() => this.handleButtonClick()}
             >
-                Run tests
+                {this.state.isRunningTests ? "Cancel tests" : "Run tests"}
             </button>
             <span>{this.state.statusMessage}</span>
             <span>{this.state.progressMessage}</span>
@@ -174,6 +179,16 @@ export class AutotestViewWidget extends ReactWidget {
             <span className="test-name" >{`Test ${result.id}`}</span>
             <span className="test-status">{result.status.toString()}</span>
         </li>
+    }
+
+    private async handleButtonClick() {
+        if(this.state.isRunningTests) {
+            console.log("Running tests...");
+            await this.handleRunTests();
+        } else {
+            console.log("Canceling tests...");
+            await this.handleCancelTests();
+        }
     }
 
     private async handleOpenTestResult(taskID: number) {
@@ -238,6 +253,22 @@ export class AutotestViewWidget extends ReactWidget {
             });
         }
 
+    }
+
+    private async handleCancelTests() {
+        if(this.state.programDirectoryURI === undefined) {
+            return;
+        }
+
+        const runningStatus = await this.autotestService.cancelTests(this.state.programDirectoryURI);
+        if(runningStatus === AutotestCancelStatus.NOT_USER_INVOKED) {
+            this.messageService.info("Could not cancel tests not invoked by user");
+            return;
+        } else if(runningStatus === AutotestCancelStatus.NO_PROGRAM) {
+            return;
+        }
+
+        await this.setStateFinished(this.state.programDirectoryURI);
     }
 
 }
