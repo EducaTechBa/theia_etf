@@ -184,10 +184,10 @@ export class AutotestViewWidget extends ReactWidget {
     private async handleButtonClick() {
         if(this.state.isRunningTests) {
             console.log("Running tests...");
-            await this.handleRunTests();
+            await this.handleCancelTests();
         } else {
             console.log("Canceling tests...");
-            await this.handleCancelTests();
+            await this.handleRunTests();
         }
     }
 
@@ -197,19 +197,7 @@ export class AutotestViewWidget extends ReactWidget {
         }
 
         this.messageService.info(`Opening 'Test ${taskID}' results...`);
-
         await this.autotestService.openResultsPage(this.state.programDirectoryURI, taskID);
-
-        // const content = await this.autotestService.getResultsPage(this.state.programDirectoryURI, taskID) ?? ''; 
-        // const newWindow = window.open('/autotester/render/render.php', 'view', 'toolbar=0,scrollbars=1,location=0,statusbar=0,menubar=0,resizable=0,width=700,height=700,left=312,top=234');
-
-        // if(newWindow) {
-        //     let html = content.replace('render.css', '/autotester/render/render.css');
-        //     html = html.replace('render.js', '/autotester/render/render.js');
-        //     html = html.replace('jsdiff/diff.js', '/autotester/render/jsdiff/diff.js');
-        //     newWindow.document.write(html);
-        // }
-
     }
 
     // TODO: Disable the 'Run Tests' button for current program
@@ -228,6 +216,7 @@ export class AutotestViewWidget extends ReactWidget {
             this.setState(state => {
                 state.statusMessage = 'Initializing testing...';
                 state.autotestResults = [];
+                state.isRunningTests = true;
                 state.progressMessage = '';
             });
 
@@ -243,10 +232,12 @@ export class AutotestViewWidget extends ReactWidget {
                 }
                 this.setState(state => {
                     state.statusMessage = message;
+                    state.isRunningTests = false;
                 });
             }
         } catch (err) {
             this.setState(state => {
+                state.isRunningTests = false;
                 state.statusMessage = err;
                 state.progressMessage = '';
                 state.autotestResults = [];
