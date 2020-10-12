@@ -1,5 +1,4 @@
-import { injectable, /*inject*/ } from "inversify";
-//import { Emitter } from '@theia/core/lib/common/event';
+import { injectable } from "inversify";
 
 export interface Task {
     taskNumber: number;
@@ -91,6 +90,13 @@ export interface ServerResponse {
     success: boolean;
     message: string;
     data: any;
+}
+
+export interface CourseInfo {
+    id: string;
+    name: string;
+    abbrev: string;
+    external: boolean;
 }
 
 @injectable()
@@ -216,7 +222,7 @@ export class GameService {
     private async delay(ms: number) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
-
+    //TODO: uradit ovo kako treba...
     private mapResponse(serverResponse: any) : ServerResponse  {
         let response = {
             success: false,
@@ -338,7 +344,7 @@ export class GameService {
         }
         await this.delay(5000).then( () => {
             secondChanceResponse = {
-                success: true,
+                success: false,
                 message: "Second chance uspio",
                 data: {
                     task_name: "Testni zadatak 3",
@@ -464,7 +470,7 @@ export class GameService {
         });
         let data = await res.json();
         data = data.data*/
-        let data = {
+        /*let data = {
             "student": "mmesihovic1",
             "tokens": 1056,
             "powerups": [
@@ -507,7 +513,7 @@ export class GameService {
                 {
                     "assignment_id": 2,
                     "task_number": 9,
-                    "task_name": "Task 100"
+                    "task_name": "Task t2 100"
                 },
             ],
             "assignmentPoints": [
@@ -540,6 +546,16 @@ export class GameService {
                     "turned_in": "8"
                 }
             ]
+        }*/
+        let data = {
+            "student": "mmesihovic1",
+            "tokens": 0,
+            "powerups": [],
+            "assignmentProgress": [],
+            "currentTasks": [],
+            "assignmentPoints": [],
+            "completedTasks": [],
+            "turnedInTasks": []
         }
         let studentData: StudentData = {
             student: data.student,
@@ -600,13 +616,11 @@ export class GameService {
                 if(_index != -1) {
                     let _tnIndex = powerupsUsedData.findIndex( (x: any) => { return x.name == 'Hint' && x.taskNumber == data.currentTasks[_index].task_number });
                     if(_tnIndex != -1) {
-                        //Posalji request da dobijes hint
                         let usedHint = await this.getUsedHint(assignment.id, data.currentTasks[_index].task_number);
                         hint = usedHint;
                     }
                     let _scIndex = powerupsUsedData.findIndex( (x: any) => { return x.name == 'Second Chance' && x.taskNumber == data.currentTasks[_index].task_number });
                     if(_scIndex != -1) {
-                        //Posalji request da dobijes previous poene
                         let _previousPoints = await this.getPreviousPoints(assignment.id, data.currentTasks[_index].task_number);
                         previousPoints = _previousPoints;
                     }

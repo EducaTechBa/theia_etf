@@ -3,7 +3,7 @@ import { injectable, postConstruct, inject } from 'inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core';
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
-import { Assignment, PowerupType, StudentData, GameService, ChallengeConfig, AssignmentDetails, TaskCategory} from './uup-game-service';
+import { Assignment, PowerupType, StudentData, GameService, ChallengeConfig, AssignmentDetails, TaskCategory, UsedPowerup, CourseInfo} from './uup-game-service';
 import { ConfirmDialog } from '@theia/core/lib/browser';
 import { SelectDialog } from './select-dialogue';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
@@ -66,6 +66,8 @@ export class UupGameViewWidget extends ReactWidget {
         }
     }
 
+    private studentCheck = false;
+
     @postConstruct()
     protected async init(): Promise < void> {
         this.id = UupGameViewWidget.ID;
@@ -74,22 +76,53 @@ export class UupGameViewWidget extends ReactWidget {
         this.title.closable = true;
         this.title.iconClass = 'fa fa-gamepad'; // Gamepad Icon
 
+        const courses = await this.getStudentCoursesInfo();
+        for(const course of courses) {
+            if(course.abbrev==='UUP' || course.abbrev==='OR') {
+                this.studentCheck = true;
+                break;
+            }
+        }
+
+        if(this.studentCheck) {
+            const _initialState = await this.initializeGameInformationState();
+
+            this.setState(state => {
+                state.handlers = _initialState.handlers;
+                state.assignments = _initialState.assignments,
+                state.powerupTypes = _initialState.powerupTypes,
+                state.challengeConfig = _initialState.challengeConfig,
+                state.taskCategories = _initialState.taskCategories,
+                state.studentData =  _initialState.studentData
+            });
+        }
+
+        this.update();
+    }
+
+    private async initializeGameInformationState() : Promise<GameInformationState> {
+        const directoryExists = await this.workspaceService.containsSome(['UUP_GAME']);
+        const workspaceURI = this.workspaceService.workspace?.resource || '';
+        const gameDirectoryURI = `${workspaceURI}/UUP_GAME`;
+        if(!directoryExists)
+            await this.fileService.createFolder(new URI(gameDirectoryURI));
+
         const _assignments = await this.gameService.getAssignments();
         const _powerupTypes = await this.gameService.getPowerupTypes();
         const _challengeConfig = await this.gameService.getChallengeConfig();
         const _taskCategories = await this.gameService.getTaskCategories();
         const _studentData = await this.gameService.getStudentData(_assignments, _powerupTypes, _challengeConfig.tasksRequired);
         const _handlers = this.generateEmptyHandlers(_assignments);
-        this.setState(state => {
-            state.handlers = _handlers;
-            state.assignments = _assignments;
-            state.powerupTypes = _powerupTypes;
-            state.challengeConfig = _challengeConfig;
-            state.taskCategories = _taskCategories;
-            state.studentData = _studentData;
-        });
-
-        this.update();
+        return {
+            storeOpen: false,
+            buyingPowerup: false,
+            handlers: _handlers,
+            assignments: _assignments,
+            powerupTypes: _powerupTypes,
+            challengeConfig: _challengeConfig,
+            taskCategories: _taskCategories,
+            studentData: _studentData
+        }
     }
 
     private setState(update: (state: GameInformationState) => void) {
@@ -97,7 +130,22 @@ export class UupGameViewWidget extends ReactWidget {
         this.update();
     }
 
-    //TODO: Dodati full URI do fajla umjesto samo NAME-a
+    private async getStudentCoursesInfo(): Promise<CourseInfo[]> {
+        const url = '/assignment/ws.php?action=courses';
+        const res = await fetch(url, {
+            credentials: 'include'
+        });
+
+        const json = await res.json();
+
+        return json.data.map((course: any) => ({
+            id: course.id,
+            name: course.name,
+            abbrev: course.abbrev,
+            external: course.external,
+        }));
+    }
+
     private generateEmptyHandlers(assignments: Assignment[]) : Record<string, boolean> {
         assignments = assignments.filter( (x) => { return x.active;});
         let handlers : Record<string,boolean> = {};
@@ -194,9 +242,9 @@ export class UupGameViewWidget extends ReactWidget {
         if(!confirmation)
             return;
 
-        const directoryExists = await this.workspaceService.containsSome([assignment.name]);
+        const directoryExists = await this.workspaceService.containsSome([`UUP_GAME/${assignment.name}`]);
         const workspaceURI = this.workspaceService.workspace?.resource || '';
-        const assignmentDirectoryURI = `${workspaceURI}/${assignment.name}`;
+        const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME/${assignment.name}`;
         //Create directory if it does not exist
         if (!directoryExists) {
             await this.fileService.createFolder(new URI(assignmentDirectoryURI));
@@ -261,7 +309,7 @@ export class UupGameViewWidget extends ReactWidget {
     }
 
     //Testirati
-    //TODO: rijesiti problem sa poenima prilikom vracanja nazad.
+    //TODO: 
     // zatvoriti i otvoriti fajlove u editoru.
     private async useSecondChancePowerup(assignment: AssignmentDetails) {
         const scPowerup = this.state.powerupTypes.find( (x: PowerupType) => x.name == 'Second Chance');
@@ -269,17 +317,24 @@ export class UupGameViewWidget extends ReactWidget {
         if(!!scPowerup)
             type_id = scPowerup.id;
         const tasks = await this.gameService.getSecondChanceAvailableTasks(assignment, type_id);
+        if(tasks.length === 0) {
+            this.messageService.error(`You do not have any available task to go back to. This error only occurs
+                                       if you have completed all tasks in assignment with all tests successful or
+                                       if you have already used this power-up on all tasks that haven't been completed
+                                       successfully. You can only return to specific task once!`);
+            return;
+        }
         const result = await new SelectDialog({
             items: tasks,
             label: task => `${task.taskNumber}. ${task.name}`,
-            title: 'Second Chance',
+            title: 'Use power-up confirmation',
             maxWidth: 500,
-            message: `Are you sure you want to\n use 'Second Chance' power up?
-                    You can only return to tasks you haven't fully finished. All 
-                    progress on current task will be saved. You can only return to 
-                    specific task once, if you make changes you need to turn it in
-                    before using this power-up again, else all progress will be lost. Below is a list of tasks with
-                    second chance available, choose wisely!`
+            message: `Are you sure you want to use 'Second Chance' power up?
+You can only return to tasks you haven't fully finished. All 
+progress on current task will be saved. You can only return to 
+specific task once, if you make changes you need to turn it in
+before using this power-up again, else all progress will be lost. Below is a list of tasks with
+second chance available, choose wisely!`
         }).open();
         if(!result) 
             return;    
@@ -294,8 +349,6 @@ export class UupGameViewWidget extends ReactWidget {
         if(assignment.finished) {
             this.messageService.info(`Using 'Second Chance' power-up on finished assignment detected. Regenerating required resources.`);
             this.generateAssignmentFiles(assignment);
-            assignment.started = true;
-            assignment.finished = false;
             createdFolders = true;
         }
         const response = await this.gameService.useSecondChance(assignment, result);
@@ -313,9 +366,14 @@ export class UupGameViewWidget extends ReactWidget {
             assignment.previousPoints = response.data.previous_points;
             //Update hint if existing
             assignment.taskHint = "";
+            assignment.powerupsUsed.push({name: "Second Chance", taskNumber: assignment.currentTask.taskNumber});
             const pIndex = assignment.powerupsUsed.findIndex( (x: any) => { return x.name == 'Hint' && x.taskNumber == assignment.currentTask.taskNumber });
             if( pIndex != -1) {
                 assignment.taskHint = await this.gameService.getUsedHint(assignment.id, assignment.currentTask.taskNumber);
+            }
+            if(assignment.finished) {
+                assignment.started = true;
+                assignment.finished = false;
             }
         } else {
             this.messageService.error(response.message);
@@ -358,7 +416,6 @@ export class UupGameViewWidget extends ReactWidget {
                 this.messageService.info(`Power-up 'Switch Task' has been used successfully. New task files are now in your workspace. Good luck!`);
                 const index = this.state.studentData?.unusedPowerups.findIndex( (x: any) => { return x.name == 'Switch Task'; });
                 this.state.studentData.unusedPowerups[index].amount -= 1;
-                this.state.studentData.tokens = response.data?.tokens;
                 //Update current assignment
                 assignment.powerupsUsed.push({name: "Switch Task", taskNumber: assignment.currentTask.taskNumber}); 
                 assignment.currentTask = {
@@ -381,26 +438,25 @@ export class UupGameViewWidget extends ReactWidget {
     }
 
     private async generateAssignmentFiles(assignment: AssignmentDetails) {
-        const directoryExists = await this.workspaceService.containsSome([assignment.name]);
+        const directoryExists = await this.workspaceService.containsSome([`UUP_GAME/${assignment.name}`]);
         const workspaceURI = this.workspaceService.workspace?.resource || '';
-        const assignmentDirectoryURI = `${workspaceURI}/${assignment.name}`;
+        const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME/${assignment.name}`;
 
         if (!directoryExists) {
             await this.fileService.createFolder(new URI(assignmentDirectoryURI));
         }
     }
-    //TODO: fix delete.
+
     private async removeAssignmentFiles(assignment: AssignmentDetails) {
-        const directoryExists = await this.workspaceService.containsSome([assignment.name]);
+        const directoryExists = await this.workspaceService.containsSome([`UUP_GAME/${assignment.name}`]);
         const workspaceURI = this.workspaceService.workspace?.resource || '';
-        const assignmentDirectoryURI = `${workspaceURI}/${assignment.name}`;
+        const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME/${assignment.name}`;
 
         if (directoryExists) {
-            await this.fileService.delete(new URI(assignmentDirectoryURI));
+            await this.fileService.delete(new URI(assignmentDirectoryURI), { recursive:true });
         }
     }
 
-    //TODO: test
     private unlockNextAssignment(assignment: AssignmentDetails) {
         let index = this.state.studentData.assignmentsData.findIndex( (x: AssignmentDetails) => x.id == assignment.id);
         if(index == this.state.studentData.assignmentsData.length-1)
@@ -410,12 +466,12 @@ export class UupGameViewWidget extends ReactWidget {
 
     //TODO:
     // zatvoriti i otvoriti fajlove
-    // modificirati handler u full URI
     // dodati check da li je user invoked testiranje bilo ili ne
+      //Hoce li praviti problem kad se second chance vrati 
     private async turnInCurrentTask(assignment: AssignmentDetails) {
         const workspaceURI = this.workspaceService.workspace?.resource || '';
-        //const assignmentDirectoryURI = `${workspaceURI}/${assignment.name}`;
-        const assignmentDirectoryURI = `${workspaceURI}/UUP/T2/Z2`;
+        const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME/${assignment.name}`;
+        //const assignmentDirectoryURI = `${workspaceURI}/UUP/T2/Z2`;
 
         const dialog = new ConfirmDialog({
             title: "Task turn in confirmation",
@@ -446,11 +502,10 @@ export class UupGameViewWidget extends ReactWidget {
             if(!check) {
                 this.state.handlers[assignment.name] = true;
                 this.autotestService.onTestsFinished( async (e: AutotestEvent) => {
-                    console.log("OnTestsFinished fired");
                     //TODO: dodati user invoked.
                     if(e.program.uri !== assignmentDirectoryURI)
                         return;
-                    //Ako jeste nastavi
+                    console.log("OnTestsFinished fired: ", assignmentDirectoryURI);
                     let tpResults = await this.autotestService.getTestPassResults(assignmentDirectoryURI);
                     let results = {
                         "passed_tests": tpResults.passed,
@@ -472,11 +527,15 @@ export class UupGameViewWidget extends ReactWidget {
                         cancel: "No"
                     });
                     const _confirmation = await _dialog.open();
-                    if(!_confirmation)
+                    if(!_confirmation) {
+                        this.setState(state => {
+                            let index = state.studentData.assignmentsData.findIndex( x => x.id == assignment.id );
+                            if(index != -1)
+                                state.studentData.assignmentsData[index].buyingPowerUp = false;
+                        });
                         return;
-                    // pozvati servis
+                    }
                     const response = await this.gameService.turnInTask(assignment, results);
-                    // upisati odgovarjuce podatke i setState pozvati
                     if(response.success) {
                         this.messageService.info(response.message);
                         assignment.tasksTurnedIn += 1;
@@ -528,10 +587,6 @@ export class UupGameViewWidget extends ReactWidget {
                         state.studentData = this.state.studentData;
                     });
                 });
-                //Do I need to do this?
-                /*this.setState(state => {
-                    state.handlers = this.state.handlers;
-                })*/
             }
         }
        
@@ -544,15 +599,29 @@ export class UupGameViewWidget extends ReactWidget {
         return sum;
     }
     
+    private hasAlreadyUsedPowerup(name: string, assignment: AssignmentDetails) : boolean {
+        let index = assignment.powerupsUsed.findIndex( (x: UsedPowerup) => x.name == name && x.taskNumber == assignment.currentTask.taskNumber );
+        return index != -1;
+    }
     
     protected render(): React.ReactNode {  
-        return <div id='uup-game-container'>
-            {this.renderGeneralStudentInfo(this.state.studentData)}
-            <ul className="assignments-list">
-                <li>{this.renderPowerupStoreInfo()}</li>
-                {this.state.studentData?.assignmentsData.map(assignmentDetails => this.renderAssignmentDetails(assignmentDetails))}
-            </ul>
-        </div>
+        let content;
+        if(!this.studentCheck) {
+            content = <div id='uup-game-container'>
+                        <div style={{margin: "10px 10px 10px 10px !important"}}>{this.renderAlertBox('error', 'fa fa-times-circle', 'Access denied',
+                                `You are not enrolled into course UUP or OR in current academic year.
+                                If you think there has been a mistake contact your professor.`)}
+                        </div>                          
+                      </div>
+        }
+        else content = <div id='uup-game-container'>
+                            {this.renderGeneralStudentInfo(this.state.studentData)}
+                            <ul className="assignments-list">
+                                <li>{this.renderPowerupStoreInfo()}</li>
+                                {this.state.studentData?.assignmentsData.map(assignmentDetails => this.renderAssignmentDetails(assignmentDetails))}
+                            </ul>
+                        </div>
+        return content;
     }
 
     private renderPowerupStoreInfo() : React.ReactNode {
@@ -645,18 +714,18 @@ export class UupGameViewWidget extends ReactWidget {
 
     private renderAlertBox(type: string, icon: string, header: string, message: string) : React.ReactNode {
 
-        return <div className='theia-alert-message-container'>
+        return <div className='theia-alert-message-container' style={{padding: "10px 5px 0px 5px !important"}}>
             <div className={`theia-${type.toLowerCase()}-alert`}>
                 <div className='theia-message-header'>
                     <i className={`${icon}`}></i>&nbsp;
                     {header}
                 </div>
-                <div className='theia-message-content'>{message}</div>
+                <div className='theia-message-content' style={{padding: "5px 0px 0px 0px !important"}}>{message}</div>
             </div>
         </div>;
     
     }
-    //TODO:
+
     private renderAssignmentDetails(assignment: AssignmentDetails) : React.ReactNode {
         let content: React.ReactNode;
         if(!assignment.unlocked) {
@@ -710,7 +779,7 @@ export class UupGameViewWidget extends ReactWidget {
                 </div>
                 <div className="powerups-buttons">
                     <button 
-                        disabled= { assignment.buyingPowerUp || !(this.getPowerupAmount('Hint') > 0) }
+                        disabled= { assignment.buyingPowerUp || !(this.getPowerupAmount('Hint') > 0) || this.hasAlreadyUsedPowerup('Hint', assignment) }
                         className="theia-button powerup-button"
                          onClick={ () => {this.useHintPowerup(assignment)} }>
                         <i className="fa fa-lightbulb-o" aria-hidden="true"></i>
@@ -722,7 +791,7 @@ export class UupGameViewWidget extends ReactWidget {
                         <i className="fa fa-undo" aria-hidden="true"></i>
                     </button>
                     <button 
-                        disabled= { assignment.buyingPowerUp || !(this.getPowerupAmount('Switch Task') > 0) }
+                        disabled= { assignment.buyingPowerUp || !(this.getPowerupAmount('Switch Task') > 0) || this.hasAlreadyUsedPowerup('Switch Task', assignment) }
                         className="theia-button powerup-button"
                         onClick = { () => {this.useSwitchTaskPowerup(assignment)} } >
                         <i className="fa fa-exchange" aria-hidden="true"></i>
@@ -747,7 +816,7 @@ export class UupGameViewWidget extends ReactWidget {
                 which you didn't fully finish. Choose wisely!
                 </span>
                 <button 
-                    disabled = { !(this.getPowerupAmount('Second Chance') > 0) }
+                    disabled = { assignment.buyingPowerUp || !(this.getPowerupAmount('Second Chance') > 0) }
                     className="theia-button af-second-chance-button"
                     onClick = { () => {this.useSecondChancePowerup(assignment)} } >
                     <i className="fa fa-undo" aria-hidden="true"></i>
