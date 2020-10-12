@@ -9,6 +9,7 @@ import { SelectDialog } from './select-dialogue';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
 import URI from '@theia/core/lib/common/uri';
 import { AutotestService, AutotestEvent } from 'autotest-view/lib/browser/autotest-service';
+import { GameHelpDialog } from './game-help-dialogue';
 
 
 interface GameInformationState {
@@ -601,6 +602,10 @@ second chance available, choose wisely!`
         let index = assignment.powerupsUsed.findIndex( (x: UsedPowerup) => x.name == name && x.taskNumber == assignment.currentTask.taskNumber );
         return index != -1;
     }
+
+    private openGameHelpDialog() {
+        new GameHelpDialog({title:"UUP GAME HELP"}).open();
+    }
     
     protected render(): React.ReactNode {  
         let content;
@@ -680,7 +685,14 @@ second chance available, choose wisely!`
             xp = 1000;
         }
         return <div className='student-info'>
-            <span className="student-header">{header}</span>
+            <div className="student-header">
+                <span>{header}</span>
+                <button
+                    className="theia-button secondary"
+                    onClick = { () => {this.openGameHelpDialog()} } >
+                    <i className="fa fa-info-circle" aria-hidden="true"></i>
+                </button>
+            </div>
             <span className="student-level">Level: {level}</span>
             <div className="progress-bar">
                     <span className="progress-bar-span">{progress.toFixed(2)}%</span>

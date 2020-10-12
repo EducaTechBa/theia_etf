@@ -115,11 +115,12 @@
 }
 
 .student-header {
-    display:inline-block;
-    text-align: center;
-    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     font-weight: 450;
     font-size: 1.3em;
+    margin: 10px;
 }
 
 .student-level {
