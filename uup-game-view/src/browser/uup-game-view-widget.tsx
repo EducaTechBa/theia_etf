@@ -146,6 +146,7 @@ export class UupGameViewWidget extends ReactWidget {
         //Confirmation window
         const dialog = new ConfirmDialog({
             title: 'Buy power-up confirmation',
+            maxWidth: 500,
             msg: `Are you sure you want to trade ${powerupType.price} tokens for power-up '${powerupType.name}'?`,
             ok: "Yes",
             cancel: "No"
@@ -180,27 +181,31 @@ export class UupGameViewWidget extends ReactWidget {
     }
     //Testirati
     // TODO: dodati otvaranje postavki i odgovarajucih fajlova nakon file switch-a
-    // dodati confirmation dialog na start.
+    // pogledati brisanje fajlova.
     private async startAssignment(assignment: AssignmentDetails) {
+        const dialog = new ConfirmDialog({
+            title: 'Start assignment confirmation',
+            maxWidth: 500,
+            msg: `Are you sure you want to start assigment '${assignment.name}'?`,
+            ok: "Yes",
+            cancel: "No"
+        });
+        const confirmation = await dialog.open();
+        if(!confirmation)
+            return;
+
+        const directoryExists = await this.workspaceService.containsSome([assignment.name]);
+        const workspaceURI = this.workspaceService.workspace?.resource || '';
+        const assignmentDirectoryURI = `${workspaceURI}/${assignment.name}`;
+        //Create directory if it does not exist
+        if (!directoryExists) {
+            await this.fileService.createFolder(new URI(assignmentDirectoryURI));
+        }  
         //Call service to start asssignment and get a response
         const response = await this.gameService.startAssignment(assignment);
-        //U zavisnosti od responsea izbacit message
         if(!response.success) {
-            console.log(JSON.stringify(response));
-            debugger;
             this.messageService.error(response.message);
-        } else {
-            const directoryExists = await this.workspaceService.containsSome([assignment.name]);
-            const workspaceURI = this.workspaceService.workspace?.resource || '';
-            const assignmentDirectoryURI = `${workspaceURI}/${assignment.name}`;
-            //Create directory if it does not exist
-            if (!directoryExists) {
-                this.messageService.info(`Generating sources for '${assignment.name}'...`);
-                await this.fileService.createFolder(new URI(assignmentDirectoryURI));
-                this.messageService.info(`Sources for '${assignment.name}' generated successfully!`);
-            } else {
-                this.messageService.error(`Resources for '${assignment.name}' already exist.`);
-            }   
+        } else {             
             //Update assignment i update state
             assignment.started = true;
             assignment.finished = false;
@@ -217,6 +222,7 @@ export class UupGameViewWidget extends ReactWidget {
     private async useHintPowerup(assignment: AssignmentDetails) {
         const dialog = new ConfirmDialog({
             title: "Use power-up confirmation",
+            maxWidth: 500,
             msg: `Are you sure you want to use powerup 'Hint' on current task in this assignment?
             This hint will be permanently visible while you are working on this task,
             even if you return to it using power-up 'Second Chance'.`,
@@ -258,20 +264,22 @@ export class UupGameViewWidget extends ReactWidget {
     //TODO: rijesiti problem sa poenima prilikom vracanja nazad.
     // zatvoriti i otvoriti fajlove u editoru.
     private async useSecondChancePowerup(assignment: AssignmentDetails) {
-
-        const tasks = await this.gameService.getSecondChanceAvailableTasks(assignment);
+        const scPowerup = this.state.powerupTypes.find( (x: PowerupType) => x.name == 'Second Chance');
+        let type_id = -1;
+        if(!!scPowerup)
+            type_id = scPowerup.id;
+        const tasks = await this.gameService.getSecondChanceAvailableTasks(assignment, type_id);
         const result = await new SelectDialog({
             items: tasks,
             label: task => `${task.taskNumber}. ${task.name}`,
             title: 'Second Chance',
-            message: `Are you sure you want to use 'Second Chance' power up?
-You can only return to tasks you haven't fully finished. All 
-progress on current task will be saved. You can only return to 
-specific task once, if you make changes you need to turn it in
-before using this power-up again, else all progress will be lost. Below is a list of tasks with
-second chance available, choose wisely!`,
-            style: {
-            }
+            maxWidth: 500,
+            message: `Are you sure you want to\n use 'Second Chance' power up?
+                    You can only return to tasks you haven't fully finished. All 
+                    progress on current task will be saved. You can only return to 
+                    specific task once, if you make changes you need to turn it in
+                    before using this power-up again, else all progress will be lost. Below is a list of tasks with
+                    second chance available, choose wisely!`
         }).open();
         if(!result) 
             return;    
@@ -290,7 +298,7 @@ second chance available, choose wisely!`,
             assignment.finished = false;
             createdFolders = true;
         }
-        const response = await this.gameService.useSecondChance(assignment);
+        const response = await this.gameService.useSecondChance(assignment, result);
         if(response.success) {
             this.messageService.info(`Power-up 'Second Chance' has been used sucessfully.`);
             this.messageService.info(`You are now back to task ${response.data.task_name} [Task ${response.data.task_number}].`);
@@ -331,6 +339,7 @@ second chance available, choose wisely!`,
     private async useSwitchTaskPowerup(assignment: AssignmentDetails) {
         const dialog = new ConfirmDialog({
             title: "Use power-up confirmation",
+            maxWidth: 500,
             msg: `Are you sure you want to use powerup 'Switch Task' on current task in this assignment?
             This will result in new task being selected from tasks database and assigned to you.`,
             ok: "Yes",
@@ -380,7 +389,7 @@ second chance available, choose wisely!`,
             await this.fileService.createFolder(new URI(assignmentDirectoryURI));
         }
     }
-    
+    //TODO: fix delete.
     private async removeAssignmentFiles(assignment: AssignmentDetails) {
         const directoryExists = await this.workspaceService.containsSome([assignment.name]);
         const workspaceURI = this.workspaceService.workspace?.resource || '';
@@ -389,6 +398,14 @@ second chance available, choose wisely!`,
         if (directoryExists) {
             await this.fileService.delete(new URI(assignmentDirectoryURI));
         }
+    }
+
+    //TODO: test
+    private unlockNextAssignment(assignment: AssignmentDetails) {
+        let index = this.state.studentData.assignmentsData.findIndex( (x: AssignmentDetails) => x.id == assignment.id);
+        if(index == this.state.studentData.assignmentsData.length-1)
+            return;
+        this.state.studentData.assignmentsData[index+1].unlocked = true;
     }
 
     //TODO:
@@ -400,9 +417,9 @@ second chance available, choose wisely!`,
         //const assignmentDirectoryURI = `${workspaceURI}/${assignment.name}`;
         const assignmentDirectoryURI = `${workspaceURI}/UUP/T2/Z2`;
 
-        //dijalozi i sranja
         const dialog = new ConfirmDialog({
             title: "Task turn in confirmation",
+            maxWidth: 500,
             msg: `Are you sure you want to turn in current task in this assignment?
             This action will automatically close tabs related to this task and run tests on current task. Testing
             can last a while depending on server load. While this action lasts, you can work on another assignment
@@ -447,6 +464,7 @@ second chance available, choose wisely!`,
                     }
                     const _dialog = new ConfirmDialog({
                         title: "Task turn in confirmation",
+                        maxWidth: 500,
                         msg: `Testing task '${assignment.currentTask.name}' has
                         been completed.\n Successful tests: ${results.passed_tests}\n Total tests: ${results.total_tests}\n
                         Are you sure you want to turn in this task?`,
@@ -457,7 +475,7 @@ second chance available, choose wisely!`,
                     if(!_confirmation)
                         return;
                     // pozvati servis
-                    const response = await this.gameService.turnInTask(assignment);
+                    const response = await this.gameService.turnInTask(assignment, results);
                     // upisati odgovarjuce podatke i setState pozvati
                     if(response.success) {
                         this.messageService.info(response.message);
@@ -469,10 +487,11 @@ second chance available, choose wisely!`,
                         };
                         if(results.passed_tests === results.total_tests) {
                             assignment.tasksFullyFinished += 1;
-                            if(this.state.challengeConfig.tasksRequired-assignment.tasksFullyFinished > 0)
+                            if(this.state.challengeConfig.tasksRequired-assignment.tasksFullyFinished > 0) 
                                 this.messageService.warn(`You need to complete ${this.state.challengeConfig.tasksRequired-assignment.tasksFullyFinished}
                                     more task${this.state.challengeConfig.tasksRequired-assignment.tasksFullyFinished==1?'':'s'}
                                     with all tests succeeded to unlock next assignment.Do not get locked out!`);
+                            else this.unlockNextAssignment(assignment);
                         }
                         if(assignment.previousPoints != -1) {
                             this.state.studentData.points -= assignment.previousPoints;
@@ -484,7 +503,6 @@ second chance available, choose wisely!`,
                         this.state.studentData.tokens += response.data.tokens;
                         //Checking for additional tokens
                         let _additionalTokens = response.data.additionalTokens;
-                        //Showing shit for used
                         this.messageService.info(`You earned ${response.data.points*1000} XP and ${response.data.tokens} tokens.`);
                         if(Object.keys(_additionalTokens).length !== 0 && _additionalTokens.constructor === Object) {
                             this.messageService.info(`Congratulations! You earned additional ${_additionalTokens.amount} tokens.

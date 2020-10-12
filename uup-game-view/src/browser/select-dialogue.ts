@@ -8,7 +8,6 @@ export class SelectDialogProps<T> extends DialogProps {
     readonly ok?: string;
     readonly cancel?: string;
     readonly message?: string;
-    readonly style: {};
     /**
      * Label provider for the `items`. If not specified `String(item)` will be used instead.
      */
