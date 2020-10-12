@@ -712,13 +712,13 @@ second chance available, choose wisely!`
 
     private renderAlertBox(type: string, icon: string, header: string, message: string) : React.ReactNode {
 
-        return <div className='theia-alert-message-container' style={{padding: "10px 5px 0px 5px !important"}}>
+        return <div className='theia-alert-message-container' >
             <div className={`theia-${type.toLowerCase()}-alert`}>
                 <div className='theia-message-header'>
                     <i className={`${icon}`}></i>&nbsp;
                     {header}
                 </div>
-                <div className='theia-message-content' style={{padding: "5px 0px 0px 0px !important"}}>{message}</div>
+                <div className='theia-message-content' >{message}</div>
             </div>
         </div>;
     
