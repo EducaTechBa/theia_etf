@@ -491,19 +491,17 @@ second chance available, choose wisely!`
                 if(index != -1)
                     state.studentData.assignmentsData[index].buyingPowerUp = true;
             });
-            // Pokrecemo testiranje
+            // Start testing
             this.messageService.info(`Starting unit testing on task '${assignment.currentTask.name}'.`);
-            this.autotestService.runTests(assignmentDirectoryURI);
+            this.autotestService.runTests(assignmentDirectoryURI, false);
             console.log("Checkpoint: Started runTests method");
-            //Hoce li praviti problem kad se second chance vrati 
-            
-            //Provjeramo da li vec egzistira handler za zadani assignment
+            //Da li ce ovo praviti problem kod second chancea??
             let check = this.state.handlers[assignment.name];
             if(!check) {
                 this.state.handlers[assignment.name] = true;
                 this.autotestService.onTestsFinished( async (e: AutotestEvent) => {
                     //TODO: dodati user invoked.
-                    if(e.program.uri !== assignmentDirectoryURI)
+                    if(e.program.isUserInvoked || e.program.uri !== assignmentDirectoryURI)
                         return;
                     console.log("OnTestsFinished fired: ", assignmentDirectoryURI);
                     let tpResults = await this.autotestService.getTestPassResults(assignmentDirectoryURI);
