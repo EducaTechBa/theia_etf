@@ -21,6 +21,7 @@ export interface Program {
     uri: string;
     status: ProgramStatus;
     totalTests: number;
+    isUserInvoked: boolean,
     result?: Result;
 }
 
@@ -77,6 +78,12 @@ export enum AutotestRunStatus {
     ERROR_OPENING_DIRECTORY = 3,
 }
 
+export enum AutotestCancelStatus {
+    CANCELED = 1,
+    NOT_USER_INVOKED = 2,
+    NO_PROGRAM = 3,
+}
+
 export interface AutotestEvent {
     program: Program,
 }
@@ -124,13 +131,16 @@ export class AutotestService {
     private readonly onTestsUpdateEmitter = new Emitter<AutotestEvent>();
     readonly onTestsUpdate = this.onTestsUpdateEmitter.event;
 
+    private readonly onTestsCanceledEmitter = new Emitter<AutotestEvent>();
+    readonly onTestsCanceled = this.onTestsCanceledEmitter.event;
+
     constructor(
         @inject(Autotester) private readonly autotester: Autotester,
         @inject(FileService) private readonly fileService: FileService,
         @inject(WorkspaceService) private readonly workspaceService: WorkspaceService,
     ) { }
 
-    public async runTests(dirURI: string): Promise<AutotestRunInfo> {
+    public async runTests(dirURI: string, isUserInvoked: boolean): Promise<AutotestRunInfo> {
         if (this.isBeingTested(dirURI)) {
             return {
                 success: false,
@@ -152,9 +162,10 @@ export class AutotestService {
 
         let program = this.getProgram(dirURI);
         if (!program) {
-            program = await this.createProgram(taskID, autotest.tests.length, dirURI);
+            program = await this.createProgram(taskID, autotest.tests.length, dirURI, isUserInvoked);
             this.state.programs[dirURI] = program;
         }
+        program.isUserInvoked = isUserInvoked;
 
         console.log(`Program ID: ${program.id}`);
 
@@ -196,13 +207,14 @@ export class AutotestService {
         };
     }
 
-    private async createProgram(taskID: string, totalTests: number, uri: string): Promise<Program> {
+    private async createProgram(taskID: string, totalTests: number, uri: string, isUserInvoked: boolean): Promise<Program> {
         const id = await this.autotester.setProgram(taskID);
         return {
             id,
             status: ProgramStatus.PROGRAM_AWAITING_TESTS,
             totalTests,
-            uri
+            uri,
+            isUserInvoked,
         };
     }
 
@@ -255,6 +267,28 @@ export class AutotestService {
         this.clearProgramResults(dirURI);
 
         this.onTestsFinishedEmitter.fire({ program });
+    }
+
+    public async cancelTests(dirURI: string, preventNonUserInvokedCancel: boolean = true): Promise<AutotestCancelStatus> {
+        const program = this.getProgram(dirURI);
+
+        if(program === undefined) {
+            return AutotestCancelStatus.NO_PROGRAM;
+        }
+
+        // TODO: Check if this condition is correct...
+        if (preventNonUserInvokedCancel && !program.isUserInvoked) {
+            return AutotestCancelStatus.NOT_USER_INVOKED;
+        }
+
+        this.removeProgram(dirURI);
+        this.onTestsCanceledEmitter.fire({ program });
+
+        return AutotestCancelStatus.CANCELED;
+    }
+
+    private removeProgram(dirURI: string) {
+        this.state.programs[dirURI] = undefined;
     }
 
     private integerToProgramStatus(status: number): ProgramStatus {
@@ -333,7 +367,8 @@ export class AutotestService {
             totalTests: 0,
             uri: dirURI,
             status: this.integerToProgramStatus(data.status),
-            result
+            result,
+            isUserInvoked: false,
         };
 
         return program;
@@ -342,7 +377,7 @@ export class AutotestService {
     public async getTestPassResults(dirURI: string): Promise<{ passed: number, total: number }> {
         const program = await this.getProgramFromAutotestResultFile(dirURI);
 
-        if(program === undefined) {
+        if (program === undefined) {
             return {
                 passed: -1,
                 total: -1,

@@ -4,13 +4,14 @@ import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core';
 import { EditorManager, EditorWidget } from '@theia/editor/lib/browser';
 import { FileSystem } from '@theia/filesystem/lib/common';
-import { AutotestService, AutotestRunStatus, Program, TestResult } from './autotest-service';
+import { AutotestService, AutotestRunStatus, Program, TestResult, AutotestCancelStatus } from './autotest-service';
 
 interface AutotestWidgetState {
     programDirectoryURI: string | undefined;
     autotestResults: TestResult[];
     statusMessage: string;
     progressMessage: string;
+    isRunningTests: boolean;
 }
 
 @injectable()
@@ -24,6 +25,7 @@ export class AutotestViewWidget extends ReactWidget {
         autotestResults: [],
         statusMessage: '',
         progressMessage: '',
+        isRunningTests: false
     };
 
     @inject(MessageService)
@@ -83,6 +85,7 @@ export class AutotestViewWidget extends ReactWidget {
             state.statusMessage = statusMessage;
             state.progressMessage = isBeingTested ? completionMessage : queueMessage;
             state.autotestResults = [];
+            state.isRunningTests = true;
         });
     }
 
@@ -102,6 +105,7 @@ export class AutotestViewWidget extends ReactWidget {
             state.statusMessage = program.status.toString();
             state.progressMessage = '';
             state.autotestResults = program.result?.testResults ?? [];
+            state.isRunningTests = false;
         });
     }
 
@@ -140,6 +144,7 @@ export class AutotestViewWidget extends ReactWidget {
                 state.autotestResults = [];
                 state.statusMessage = 'No autotests defined.';
                 state.progressMessage = '';
+                state.isRunningTests = false;
             });
             return;
         }
@@ -151,9 +156,9 @@ export class AutotestViewWidget extends ReactWidget {
         return <div id='autotests-container'>
             <button
                 className="theia-button run-tests-button"
-                onClick={() => this.handleRunTests()}
+                onClick={() => this.handleButtonClick()}
             >
-                Run tests
+                {this.state.isRunningTests ? "Cancel tests" : "Run tests"}
             </button>
             <span>{this.state.statusMessage}</span>
             <span>{this.state.progressMessage}</span>
@@ -176,25 +181,23 @@ export class AutotestViewWidget extends ReactWidget {
         </li>
     }
 
+    private async handleButtonClick() {
+        if(this.state.isRunningTests) {
+            console.log("Running tests...");
+            await this.handleCancelTests();
+        } else {
+            console.log("Canceling tests...");
+            await this.handleRunTests();
+        }
+    }
+
     private async handleOpenTestResult(taskID: number) {
         if (this.state.programDirectoryURI === undefined) {
             return;
         }
 
         this.messageService.info(`Opening 'Test ${taskID}' results...`);
-
         await this.autotestService.openResultsPage(this.state.programDirectoryURI, taskID);
-
-        // const content = await this.autotestService.getResultsPage(this.state.programDirectoryURI, taskID) ?? ''; 
-        // const newWindow = window.open('/autotester/render/render.php', 'view', 'toolbar=0,scrollbars=1,location=0,statusbar=0,menubar=0,resizable=0,width=700,height=700,left=312,top=234');
-
-        // if(newWindow) {
-        //     let html = content.replace('render.css', '/autotester/render/render.css');
-        //     html = html.replace('render.js', '/autotester/render/render.js');
-        //     html = html.replace('jsdiff/diff.js', '/autotester/render/jsdiff/diff.js');
-        //     newWindow.document.write(html);
-        // }
-
     }
 
     // TODO: Disable the 'Run Tests' button for current program
@@ -213,10 +216,11 @@ export class AutotestViewWidget extends ReactWidget {
             this.setState(state => {
                 state.statusMessage = 'Initializing testing...';
                 state.autotestResults = [];
+                state.isRunningTests = true;
                 state.progressMessage = '';
             });
 
-            const runInfo = await this.autotestService.runTests(this.state.programDirectoryURI);
+            const runInfo = await this.autotestService.runTests(this.state.programDirectoryURI, true);
             if (!runInfo.success) {
                 let message = "";
                 if (runInfo.status === AutotestRunStatus.ERROR_OPENING_DIRECTORY) {
@@ -228,16 +232,34 @@ export class AutotestViewWidget extends ReactWidget {
                 }
                 this.setState(state => {
                     state.statusMessage = message;
+                    state.isRunningTests = false;
                 });
             }
         } catch (err) {
             this.setState(state => {
+                state.isRunningTests = false;
                 state.statusMessage = err;
                 state.progressMessage = '';
                 state.autotestResults = [];
             });
         }
 
+    }
+
+    private async handleCancelTests() {
+        if(this.state.programDirectoryURI === undefined) {
+            return;
+        }
+
+        const runningStatus = await this.autotestService.cancelTests(this.state.programDirectoryURI);
+        if(runningStatus === AutotestCancelStatus.NOT_USER_INVOKED) {
+            this.messageService.info("Could not cancel tests not invoked by user");
+            return;
+        } else if(runningStatus === AutotestCancelStatus.NO_PROGRAM) {
+            return;
+        }
+
+        await this.setStateFinished(this.state.programDirectoryURI);
     }
 
 }
