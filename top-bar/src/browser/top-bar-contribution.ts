@@ -4,7 +4,7 @@ import { TopBarWidget } from './top-bar-widget';
 import { AbstractViewContribution } from '@theia/core/lib/browser';
 import { Command, CommandRegistry } from '@theia/core/lib/common/command';
 import { FrontendApplicationStateService } from '@theia/core/lib/browser/frontend-application-state';
-import { WorkspaceService } from '@theia/workspace/lib/browser';
+import { WorkspaceService, WorkspaceCommands } from '@theia/workspace/lib/browser';
 import { FrontendApplication, FrontendApplicationContribution } from '@theia/core/lib/browser';
 import { MaybePromise } from '@theia/core/lib/common/types';
 import { TerminalMenus, TerminalCommands } from '@theia/terminal/lib/browser/terminal-frontend-contribution';
@@ -39,6 +39,16 @@ export class TopBarContribution extends AbstractViewContribution<TopBarWidget> i
             .forEach(([_, cmd]: [string, Command]) =>
                 commands.unregisterCommand(cmd)
             );
+
+        const { OPEN, OPEN_FILE, OPEN_FOLDER, OPEN_WORKSPACE, OPEN_RECENT_WORKSPACE, SAVE_WORKSPACE_AS, CLOSE } = WorkspaceCommands;
+
+        commands.unregisterCommand(OPEN);
+        commands.unregisterCommand(OPEN_FILE);
+        commands.unregisterCommand(OPEN_FOLDER);
+        commands.unregisterCommand(OPEN_WORKSPACE);
+        commands.unregisterCommand(OPEN_RECENT_WORKSPACE);
+        commands.unregisterCommand(SAVE_WORKSPACE_AS);
+        commands.unregisterCommand(CLOSE);
     }
 
     registerMenus(menus: MenuModelRegistry): void {
