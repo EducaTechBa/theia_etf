@@ -123,6 +123,16 @@
     margin: 10px;
 }
 
+.helpDialogButton {
+    min-width: auto !important;
+}
+
+.game-rules {
+    display: inline-block;
+    text-align: center;
+    width: 100%;
+}
+
 .student-level {
     display: inline-block;
     text-align: center;

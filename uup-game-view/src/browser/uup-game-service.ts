@@ -105,85 +105,13 @@ export class GameService {
     private BASE_URL = "http://34.69.254.181/services/uup_game.php?action="
 
     public async getAssignments() : Promise<Assignment[]> {
-        /*let requestURL = this.BASE_URL +`getAssignments`;
+        let requestURL = this.BASE_URL +`getAssignments`;
         let res = await fetch(requestURL, {
             method: "GET",
             credentials: "include"
         });
         let data = await res.json();
-        return Promise.resolve(data.data);*/
-        return Promise.resolve([
-            {
-                "id": 1,
-                "name": "Lesson 1",
-                "active": true,
-                "points": 3,
-                "challenge_pts": 2
-            },
-            {
-                "id": 2,
-                "name": "Lesson 2",
-                "active": true,
-                "points": 3,
-                "challenge_pts": 2
-            },
-            {
-                "id": 3,
-                "name": "Lesson 3",
-                "active": true,
-                "points": 3,
-                "challenge_pts": 2
-            },
-            {
-                "id": 4,
-                "name": "Lesson 4",
-                "active": true,
-                "points": 3,
-                "challenge_pts": 2
-            },
-            {
-                "id": 5,
-                "name": "Lesson 5",
-                "active": true,
-                "points": 3,
-                "challenge_pts": 2
-            },
-            {
-                "id": 6,
-                "name": "Lesson 6",
-                "active": false,
-                "points": 3,
-                "challenge_pts": 2
-            },
-            {
-                "id": 7,
-                "name": "Lesson 7",
-                "active": false,
-                "points": 3,
-                "challenge_pts": 2
-            },
-            {
-                "id": 8,
-                "name": "Lesson 8",
-                "active": false,
-                "points": 3,
-                "challenge_pts": 2
-            },
-            {
-                "id": 9,
-                "name": "Lesson 9",
-                "active": false,
-                "points": 3,
-                "challenge_pts": 2
-            },
-            {
-                "id": 10,
-                "name": "Lesson 10",
-                "active": false,
-                "points": 3,
-                "challenge_pts": 2
-            }
-        ]);
+        return Promise.resolve(data.data);
     }
 
     public async getPowerupTypes() : Promise<PowerupType[]> {
@@ -193,7 +121,6 @@ export class GameService {
             credentials: "include"
         });
         let data = await res.json();
-        console.log("Powerup type data received: " + JSON.stringify(data));
         return Promise.resolve(data.data);
     }
 
@@ -204,7 +131,6 @@ export class GameService {
             credentials: "include"
         });
         let data = await res.json();
-        console.log("Challenge cfg data received: " + JSON.stringify(data));
         return Promise.resolve(data.data);
     }
 
@@ -215,13 +141,13 @@ export class GameService {
             credentials: "include"
         });
         let data = await res.json();
-        console.log("Task Categories data received: " + JSON.stringify(data));
         return Promise.resolve(data.data);
     }
-
+    /*
     private async delay(ms: number) {
         return new Promise(resolve => setTimeout(resolve, ms));
-    }
+    }*/
+
     //TODO: uradit ovo kako treba...
     private mapResponse(serverResponse: any) : ServerResponse  {
         let response = {
@@ -229,26 +155,24 @@ export class GameService {
             message: "",
             data: {}
         };
-        if(!serverResponse.success) 
-            return {
-                success: false,
-                message: serverResponse.message,
-                data: {}
+       
+        if(!serverResponse.success) {
+            response = {
+                success: serverResponse.success,
+                message: !Object.keys(serverResponse).includes('data') ? serverResponse.data.reason : serverResponse.message,
+                data: serverResponse.data
             }
-        if(!!serverResponse && !serverResponse.reason) {
-            response.success = false;
-            response.message = serverResponse.data.reason;
-            response.data = {};
-        } else {
-            response.success = true;
-            response.message = serverResponse.message;
-            response.data = serverResponse.data;
+        }
+        else response = {
+            success: serverResponse.success,
+            message: !Object.keys(serverResponse).includes('data') ? serverResponse.data.message : serverResponse.message,
+            data: serverResponse.data
         }
         return response;
     }
 
-    public async buyPowerup(powerupType: PowerupType) : Promise<PowerupResponse> {
-        let powerupResponse = {
+    public async buyPowerup(powerupType: PowerupType) : Promise<ServerResponse> {
+        /*let powerupResponse = {
             success: false,
             message: "",
             powerupType: "1",
@@ -263,8 +187,8 @@ export class GameService {
                 "price": 60,
                 "tokens": 75
             };
-        });   
-        /*let requestURL = this.BASE_URL + `buyPowerUp&type_id=${powerupType.id}`;
+        });   */
+        let requestURL = this.BASE_URL + `buyPowerUp&type_id=${powerupType.id}`;
         let res = await fetch(requestURL, {
             method: "POST",
             credentials: "include",
@@ -273,12 +197,12 @@ export class GameService {
             }
         })
         let data = await res.json();
-        return Promise.resolve(this.mapResponse(data));*/
-        return Promise.resolve(powerupResponse); 
+        return Promise.resolve(this.mapResponse(data));
+        //return Promise.resolve(powerupResponse); 
     }
 
     public async startAssignment(assignment: AssignmentDetails) : Promise<ServerResponse> {
-        /*let requestURL = this.BASE_URL +`startAssignment&assignment_id=${assignment.id}`;
+        let requestURL = this.BASE_URL +`startAssignment&assignment_id=${assignment.id}`;
         let res = await fetch(requestURL, {
             method: "POST",
             credentials: "include",
@@ -287,8 +211,8 @@ export class GameService {
             }
         });
         let data = await res.json();
-        return Promise.resolve(this.mapResponse(data));*/
-        return Promise.resolve({
+        return Promise.resolve(this.mapResponse(data));
+      /*  return Promise.resolve({
             success: true,
             message: "Assignment successfully started.",
             data: {
@@ -298,11 +222,11 @@ export class GameService {
                     "task_name": "Task 260"
                 }
             }
-        });
+        });*/
     } 
 
     public async useHint(assignment: AssignmentDetails) : Promise<ServerResponse> {
-        let hintResponse = {
+       /* let hintResponse = {
             success: false,
             message: "",
             data: {}
@@ -316,8 +240,8 @@ export class GameService {
                     tokens: 70,
                 }
             };
-        });
-        /*
+        });*/
+        
         let requestURL = this.BASE_URL + `hint&assignment_id=${assignment.id}`;
         let res = await fetch(requestURL, {
             method: "POST",
@@ -328,12 +252,11 @@ export class GameService {
         });
         let data = await res.json();
         return Promise.resolve(this.mapResponse(data));
-        */
-        return Promise.resolve(hintResponse);
+        //return Promise.resolve(hintResponse);
     }
 
     public async useSecondChance(assignment: AssignmentDetails, task: Task) : Promise<ServerResponse> {
-        let secondChanceResponse = {
+      /*  let secondChanceResponse = {
             success: false,
             message: "",
             data: {
@@ -352,8 +275,8 @@ export class GameService {
                     previous_points: 0.15
                 }
             };
-        });
-        /*
+        });*/
+        
         let requestURL = this.BASE_URL + `secondChance&assignment_id=${assignment.id}`;
         let res = await fetch(requestURL, {
             method: "POST",
@@ -368,9 +291,7 @@ export class GameService {
         });
         let data = await res.json();
         return Promise.resolve(this.mapResponse(data));
-        */
-        return Promise.resolve(secondChanceResponse);
-       
+        //return Promise.resolve(secondChanceResponse);       
     }
 
     public async switchTask(assignment: AssignmentDetails) : Promise<ServerResponse> {
@@ -387,7 +308,7 @@ export class GameService {
     }
 
     public async turnInTask(assignment: AssignmentDetails, testData: {total_tests: number; passed_tests: number}) : Promise<ServerResponse> {
-        /*
+        
         let requestURL = this.BASE_URL + `turnTaskIn&assignment_id=${assignment.id}`;
         let res = await fetch(requestURL, {
             method: "POST",
@@ -399,8 +320,7 @@ export class GameService {
         });
         let data = await res.json();
         return Promise.resolve(this.mapResponse(data));
-        */
-        return Promise.resolve({
+        /*return Promise.resolve({
             success:true,
             message: "Current task for student mmesihovic1 in given assignment has been been turned in successfully.",
             data:  {
@@ -413,18 +333,18 @@ export class GameService {
                     "task_name": "Assignment finished"
                 }
             }
-        })
+        })*/
     }
 
-    public async getSecondChanceAvailableTasks(assignment: AssignmentDetails, type_id: number) : Promise<Task[]> {
-        /*let requestURL = this.BASE_URL +`getAvailableTasks&assignment_id=${assignment.id}&type_id=${type_id}`;
+    public async getSecondChanceAvailableTasks(assignment: AssignmentDetails, type_id: number) : Promise<ServerResponse> {
+        let requestURL = this.BASE_URL +`getAvailableTasks&assignment_id=${assignment.id}&type_id=${type_id}`;
         let res = await fetch(requestURL, {
             method: "GET",
             credentials: "include"
         });
         let data = await res.json();
-        return Promise.resolve(data.data);*/
-        return Promise.resolve([{
+        return Promise.resolve(this.mapResponse(data));
+       /* return Promise.resolve([{
             "name": "Testni task 1",
             "taskNumber": 1
         },
@@ -436,135 +356,52 @@ export class GameService {
             "name": "Testni task 4",
             "taskNumber": 4
         }]
-        );
+        );*/
     }
 
-    public async getUsedHint(assignment_id : number, taskNumber: number) : Promise<string> {
+    public async getUsedHint(assignment_id : number, taskNumber: number) : Promise<ServerResponse> {
 
-        /*let requestURL = this.BASE_URL + `getUsedHint&assignment_id=${assignment.id}&task_number=${assignment.currentTask.taskNumber}`;
+        let requestURL = this.BASE_URL + `getUsedHint&assignment_id=${assignment_id}&task_number=${taskNumber}`;
         let res = await fetch(requestURL, {
             method: "GET",
             credentials: "include",
         });
         let data = await res.json();
-        return Promise.resolve(data.data.hint); */
-        return Promise.resolve("Neki testni hint koji sam vec koristio");
+        return Promise.resolve(this.mapResponse(data)); 
     }
 
-    public async getPreviousPoints(assignment_id : number, taskNumber: number) : Promise<number> {
-        /*let requestURL = this.BASE_URL + `getTaskPreviousPoints&assignment_id=${assignment.id}&task_number=${assignment.currentTask.taskNumber}`;
+    public async getPreviousPoints(assignment_id : number, taskNumber: number) : Promise<ServerResponse> {
+        let requestURL = this.BASE_URL + `getTaskPreviousPoints&assignment_id=${assignment_id}&task_number=${taskNumber}`;
         let res = await fetch(requestURL, {
             method: "GET",
             credentials: "include",
         });
         let data = await res.json();
-        return Promise.resolve(data.data.points); */
-        return Promise.resolve(0.15);
+        return Promise.resolve(this.mapResponse(data)); 
+        //return Promise.resolve(0.15);
     }
 
     public async getStudentData(assignments: Assignment[], powerupTypes: PowerupType[], taskRequirement: number) : Promise<StudentData> {
-        /*let requestURL = this.BASE_URL +`getStudentData`;
+        let requestURL = this.BASE_URL +`getStudentData`;
         let res = await fetch(requestURL, {
             method: "GET",
             credentials: "include"
         });
-        let data = await res.json();
-        data = data.data*/
-        /*let data = {
-            "student": "mmesihovic1",
-            "tokens": 1056,
-            "powerups": [
-                {
-                    "type_id": 3,
-                    "used": false,
-                    "assignment_id": null,
-                    "task_number": null
-                },
-                {
-                    "type_id": 1,
-                    "used": true,
-                    "assignment_id": 2,
-                    "task_number": 9
-                },
-                {
-                    "type_id": 2,
-                    "used": true,
-                    "assignment_id": 1,
-                    "task_number": 12
-                },
-                {
-                    "type_id": 1,
-                    "used": false,
-                    "assignment_id": null,
-                    "task_number": null
-                }
-            ],
-            "assignmentProgress": [
-                {
-                    "assignment_id": 1,
-                    "status": "Completed"
-                },
-                {
-                    "assignment_id": 2,
-                    "status": "In Progress"
-                },
-            ],
-            "currentTasks": [
-                {
-                    "assignment_id": 2,
-                    "task_number": 9,
-                    "task_name": "Task t2 100"
-                },
-            ],
-            "assignmentPoints": [
-                {
-                    "assignment_id": 1,
-                    "points": 2.94286
-                },
-                {
-                    "assignment_id": 2,
-                    "points": 1.57143
-                }
-            ],
-            "completedTasks": [
-                {
-                    "assignment_id": 1,
-                    "completed": "13"
-                },
-                {
-                    "assignment_id": 2,
-                    "completed": "4"
-                }
-            ],
-            "turnedInTasks": [
-                {
-                    "assignment_id": 1,
-                    "turned_in": "15"
-                },
-                {
-                    "assignment_id": 2,
-                    "turned_in": "8"
-                }
-            ]
-        }*/
-        let data = {
-            "student": "mmesihovic1",
-            "tokens": 0,
-            "powerups": [],
-            "assignmentProgress": [],
-            "currentTasks": [],
-            "assignmentPoints": [],
-            "completedTasks": [],
-            "turnedInTasks": []
+        let _data = await res.json();
+        console.log(JSON.stringify(_data));
+        if(_data.success) {
+            let data = _data.data;
+        
+            let studentData: StudentData = {
+                student: data.student,
+                tokens: data.tokens,
+                points: this.mapPoints(data),
+                unusedPowerups: this.mapUnusedPowerupData(data.powerups, powerupTypes),
+                assignmentsData: await this.mapAssignmentDetails(data, assignments, powerupTypes, taskRequirement)
+            }
+            return Promise.resolve(studentData);
         }
-        let studentData: StudentData = {
-            student: data.student,
-            tokens: data.tokens,
-            points: this.mapPoints(data),
-            unusedPowerups: this.mapUnusedPowerupData(data.powerups, powerupTypes),
-            assignmentsData: await this.mapAssignmentDetails(data, assignments, powerupTypes, taskRequirement)
-        }
-        return Promise.resolve(studentData);
+        else throw _data.message;
     }
 
     private mapPoints(data: any): number {
@@ -577,6 +414,7 @@ export class GameService {
 
     private mapUsedPowerupData(data: any, powerupTypes: PowerupType[], _assignment_id: number): UsedPowerup[] {
         let _used : UsedPowerup[] = [];
+        if(data.length == 0) return [];
         for(const {type_id, used, assignment_id, task_number} of data) {    
             let typeData = powerupTypes.find( (x) => { return x.id == type_id});  
             if(typeData && used && _assignment_id == assignment_id) {
@@ -588,6 +426,7 @@ export class GameService {
 
     private mapUnusedPowerupData(data: any, powerupTypes: PowerupType[]) {
         let _unused : {name: string, amount: number}[] = [];
+        if(data.length == 0) return [];
         for(const {type_id, used} of data) {    
             let typeData = powerupTypes.find( (x) => { return x.id == type_id});  
             if(typeData && !used) {
@@ -616,13 +455,16 @@ export class GameService {
                 if(_index != -1) {
                     let _tnIndex = powerupsUsedData.findIndex( (x: any) => { return x.name == 'Hint' && x.taskNumber == data.currentTasks[_index].task_number });
                     if(_tnIndex != -1) {
-                        let usedHint = await this.getUsedHint(assignment.id, data.currentTasks[_index].task_number);
-                        hint = usedHint;
+                        let hintResponse = await this.getUsedHint(assignment.id, data.currentTasks[_index].task_number);
+                        if(!hintResponse.success) {
+                            hint = hintResponse.data.hint;
+                        } else throw hintResponse.message;
                     }
                     let _scIndex = powerupsUsedData.findIndex( (x: any) => { return x.name == 'Second Chance' && x.taskNumber == data.currentTasks[_index].task_number });
                     if(_scIndex != -1) {
-                        let _previousPoints = await this.getPreviousPoints(assignment.id, data.currentTasks[_index].task_number);
-                        previousPoints = _previousPoints;
+                        let previousPointsResponse = await this.getPreviousPoints(assignment.id, data.currentTasks[_index].task_number);
+                        if(!previousPointsResponse.success)
+                            previousPoints = previousPointsResponse.data.points;
                     }
                 }
                 let _assignmentDetails : AssignmentDetails = {
@@ -631,10 +473,10 @@ export class GameService {
                     unlocked: true,
                     started: true,
                     finished: data.assignmentProgress[index].status == "Completed",
-                    tasksFullyFinished: parseInt(data.completedTasks[_ffIndex].completed),
-                    tasksTurnedIn: parseInt(data.turnedInTasks[_tiIndex].turned_in),
+                    tasksFullyFinished: (_ffIndex != -1) ? parseInt(data.completedTasks[_ffIndex].completed) : 0,
+                    tasksTurnedIn: (_tiIndex != -1) ? parseInt(data.turnedInTasks[_tiIndex].turned_in) : 0,
                     previousPoints: previousPoints,
-                    points: data.assignmentPoints[_pIndex].points,
+                    points: (_pIndex != -1) ? data.assignmentPoints[_pIndex].points : 0,
                     currentTask: (_index == -1) ? {name:"Loading", taskNumber: -1} : {
                         name: data.currentTasks[_index].task_name,
                         taskNumber: data.currentTasks[_index].task_number
