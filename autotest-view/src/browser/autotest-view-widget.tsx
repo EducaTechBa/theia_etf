@@ -64,6 +64,15 @@ export class AutotestViewWidget extends ReactWidget {
 
         this.editorManager.onCreated(editorWidget => this.handleEditorSwitch(editorWidget));
         this.editorManager.onActiveEditorChanged(editorWidget => this.handleEditorSwitch(editorWidget));
+
+        const initialActiveEditor = this.getInitialActiveEditor();
+        if(initialActiveEditor) {
+            this.handleEditorSwitch(initialActiveEditor)
+        }
+    }
+
+    private getInitialActiveEditor(): EditorWidget | undefined {
+        return this.editorManager.currentEditor;
     }
 
     private setState(update: (state: AutotestWidgetState) => void) {
@@ -168,8 +177,6 @@ export class AutotestViewWidget extends ReactWidget {
         </div>
     }
 
-    // TODO: Add onClick handler to open the details view!!!
-    //       Try to open the view in a new tab or, if it must be, a new window
     private renderTestResultItem(result: TestResult): React.ReactNode {
         return <li
             key={result.id}
@@ -183,10 +190,10 @@ export class AutotestViewWidget extends ReactWidget {
 
     private async handleButtonClick() {
         if(this.state.isRunningTests) {
-            console.log("Running tests...");
+            console.log("Canceling tests...");
             await this.handleCancelTests();
         } else {
-            console.log("Canceling tests...");
+            console.log("Running tests...");
             await this.handleRunTests();
         }
     }
@@ -200,8 +207,6 @@ export class AutotestViewWidget extends ReactWidget {
         await this.autotestService.openResultsPage(this.state.programDirectoryURI, taskID);
     }
 
-    // TODO: Disable the 'Run Tests' button for current program
-    //       while tests are running...
     private async handleRunTests() {
         if (!this.state.programDirectoryURI) {
             return;
