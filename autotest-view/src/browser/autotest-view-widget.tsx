@@ -172,18 +172,19 @@ export class AutotestViewWidget extends ReactWidget {
             <span>{this.state.statusMessage}</span>
             <span>{this.state.progressMessage}</span>
             <ul className="test-list">
-                {this.state.autotestResults.map(result => this.renderTestResultItem(result))}
+                {this.state.autotestResults
+                    .map((result, index) => this.renderTestResultItem(index, result))}
             </ul>
         </div>
     }
 
-    private renderTestResultItem(result: TestResult): React.ReactNode {
+    private renderTestResultItem(index: number, result: TestResult): React.ReactNode {
         return <li
-            key={result.id}
+            key={index}
             className={`test-result ${result.success ? 'test-success' : 'test-fail'}`}
             onClick={() => this.handleOpenTestResult(result.id)}
         >
-            <span className="test-name" >{`Test ${result.id}`}</span>
+            <span className="test-name" >{`Test ${index + 1}`}</span>
             <span className="test-status">{result.status.toString()}</span>
         </li>
     }
