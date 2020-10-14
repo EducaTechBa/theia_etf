@@ -159,13 +159,13 @@ export class GameService {
         if(!serverResponse.success) {
             response = {
                 success: serverResponse.success,
-                message: !Object.keys(serverResponse).includes('data') ? serverResponse.data.reason : serverResponse.message,
+                message: Object.keys(serverResponse).includes('data') ? serverResponse.data.reason : serverResponse.message,
                 data: serverResponse.data
             }
         }
         else response = {
             success: serverResponse.success,
-            message: !Object.keys(serverResponse).includes('data') ? serverResponse.data.message : serverResponse.message,
+            message: Object.keys(serverResponse).includes('data') ? serverResponse.data.message : serverResponse.message,
             data: serverResponse.data
         }
         return response;
@@ -308,7 +308,7 @@ export class GameService {
     }
 
     public async turnInTask(assignment: AssignmentDetails, testData: {total_tests: number; passed_tests: number}) : Promise<ServerResponse> {
-        
+        console.log("DA VIDIMO STA JE BODY", JSON.stringify(testData));
         let requestURL = this.BASE_URL + `turnTaskIn&assignment_id=${assignment.id}`;
         let res = await fetch(requestURL, {
             method: "POST",
@@ -388,7 +388,7 @@ export class GameService {
             credentials: "include"
         });
         let _data = await res.json();
-        console.log(JSON.stringify(_data));
+        console.log("blabla: ", JSON.stringify(_data));
         if(_data.success) {
             let data = _data.data;
         

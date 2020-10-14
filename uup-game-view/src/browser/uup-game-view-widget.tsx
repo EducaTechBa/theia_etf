@@ -94,8 +94,9 @@ export class UupGameViewWidget extends ReactWidget {
         }
         try {
             if(this.studentCheck) {
+                this.messageService.info("Started initializiing game information state");
                 const _initialState = await this.initializeGameInformationState();
-
+                this.messageService.info("completed");
                 this.setState(state => {
                     state.handlers = _initialState.handlers;
                     state.assignments = _initialState.assignments,
@@ -113,7 +114,7 @@ export class UupGameViewWidget extends ReactWidget {
             this.messageService.error("Failed fetching student data. UUP Game extension will not start.");
         }
     }
-
+    //TODO: Add error handling
     private async initializeGameInformationState() : Promise<GameInformationState> {
         const directoryExists = await this.workspaceService.containsSome(['UUP_GAME']);
         const workspaceURI = this.workspaceService.workspace?.resource || '';
@@ -126,7 +127,7 @@ export class UupGameViewWidget extends ReactWidget {
         const _powerupTypes = await this.gameService.getPowerupTypes();
         const _challengeConfig = await this.gameService.getChallengeConfig();
         const _taskCategories = await this.gameService.getTaskCategories();
-        const _studentData = await this.gameService.getStudentData(_assignments, _powerupTypes, _challengeConfig.tasksRequired);
+        const _studentData = await this.gameService.getStudentData(_assignments, _powerupTypes, _challengeConfig?.tasksRequired);
         const _handlers = this.generateEmptyHandlers(_assignments);
         return {
             storeOpen: false,
@@ -268,6 +269,8 @@ export class UupGameViewWidget extends ReactWidget {
         }  
         //Call service to start asssignment and get a response
         const response = await this.gameService.startAssignment(assignment);
+        console.log("Start assignment response: ", response);
+        console.log("Start assignment response: ", JSON.stringify(response));
         if(!response.success) {
             this.messageService.error(response.message);
             this.removeAssignmentFiles(assignment);
@@ -504,7 +507,7 @@ second chance available, choose wisely!`
     private async turnInCurrentTask(assignment: AssignmentDetails) {
         const workspaceURI = this.workspaceService.workspace?.resource || '';
         const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME/${assignment.name}`;
-        //const assignmentDirectoryURI = `${workspaceURI}/UUP/T2/Z2`;
+        //const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME`;
 
         const dialog = new ConfirmDialog({
             title: "Task turn in confirmation",
@@ -526,7 +529,8 @@ second chance available, choose wisely!`
             });
             // Start testing
             this.messageService.info(`Starting unit testing on task '${assignment.currentTask.name}'.`);
-            this.autotestService.runTests(assignmentDirectoryURI, false);
+            const testStatus = await this.autotestService.runTests(assignmentDirectoryURI, false);
+            console.log("Test status:" ,JSON.stringify(testStatus));
             console.log("Checkpoint: Started runTests method");
             //Da li ce ovo praviti problem kod second chancea??
             let check = this.state.handlers[assignment.name];
@@ -534,6 +538,7 @@ second chance available, choose wisely!`
                 this.state.handlers[assignment.name] = true;
                 this.autotestService.onTestsFinished( async (e: AutotestEvent) => {
                     //TODO: dodati user invoked.
+                    console.log("OnTestsFinished fired check:", e.program.isUserInvoked, e.program.uri);
                     if(e.program.isUserInvoked || e.program.uri !== assignmentDirectoryURI)
                         return;
                     console.log("OnTestsFinished fired: ", assignmentDirectoryURI);
@@ -567,6 +572,7 @@ second chance available, choose wisely!`
                         return;
                     }
                     const response = await this.gameService.turnInTask(assignment, results);
+                    console.log("TURN IN TASK RESPONSE: ", JSON.stringify(response));
                     if(response.success) {
                         this.messageService.info(response.message);
                         assignment.tasksTurnedIn += 1;
