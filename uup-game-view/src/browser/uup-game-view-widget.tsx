@@ -96,7 +96,6 @@ export class UupGameViewWidget extends ReactWidget {
             if(this.studentCheck) {
                 this.messageService.info("Started initializiing game information state");
                 const _initialState = await this.initializeGameInformationState();
-                this.messageService.info("completed");
                 this.setState(state => {
                     state.handlers = _initialState.handlers;
                     state.assignments = _initialState.assignments,
@@ -270,8 +269,6 @@ export class UupGameViewWidget extends ReactWidget {
         }  
         //Call service to start asssignment and get a response
         const response = await this.gameService.startAssignment(assignment);
-        console.log("Start assignment response: ", response);
-        console.log("Start assignment response: ", JSON.stringify(response));
         if(!response.success) {
             this.messageService.error(response.message);
             this.removeAssignmentFiles(assignment);
@@ -553,8 +550,8 @@ second chance available, choose wisely!`
                     console.log(JSON.stringify(results));
                     //Testing purposes
                     results = {
-                        "passed_tests": 6,
-                        "total_tests": 9
+                        "passed_tests": 10,
+                        "total_tests": 10
                     }
                     const _dialog = new ConfirmDialog({
                         title: "Task turn in confirmation",
@@ -647,13 +644,13 @@ second chance available, choose wisely!`
     private openGameHelpDialog() {
         new GameHelpDialog({title:"UUP GAME INFORMATION & HELP"}).open();
     }
-
+/*
     private async openGameRules() {
         let uri = new URI(this.workspaceService.workspace?.resource+'/UUP_GAME/Lesson 1/nesto.html');
         //open(this.openerService, uri, { preview: 'true' } );
         this.miniBrowserOpenHanlder.open(uri);
     }
-    
+  */  
     protected render(): React.ReactNode {  
         let content;
         if(!this.studentCheck) {
@@ -731,7 +728,7 @@ second chance available, choose wisely!`
             progress = 100;
             xp = 1000;
         }
-        /*  */
+        /* <span className="game-rules"><a href="" onClick= { () => { this.openGameRules()} }>GAME RULES</a></span> */
         return <div className='student-info'>
             <div className="student-header">
                 <span>{header}</span>
@@ -741,7 +738,7 @@ second chance available, choose wisely!`
                     <i className="fa fa-info-circle" aria-hidden="true"></i>
                 </button>
             </div>
-            <span className="game-rules"><a href="" onClick= { () => { this.openGameRules()} }>GAME RULES</a></span>
+            
             <span className="student-level">Level: {level}</span>
             <div className="progress-bar">
                     <span className="progress-bar-span">{progress.toFixed(2)}%</span>

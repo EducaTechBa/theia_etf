@@ -40,7 +40,7 @@ export class SelectDialog<T> extends AbstractDialog<T> {
             option.value = label(item);
             select.appendChild(option);
         }
-        const selectionListener = () => { debugger; this.selectedIndex = select.selectedIndex; }
+        const selectionListener = () => { this.selectedIndex = select.selectedIndex; }
         select.addEventListener('change', selectionListener);
         this.toDispose.push(Disposable.create(() => select.removeEventListener('change', selectionListener)));
         this.contentNode.appendChild(messageDiv);

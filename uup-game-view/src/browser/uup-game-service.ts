@@ -197,7 +197,6 @@ export class GameService {
             }
         })
         let data = await res.json();
-        console.log("u metodi servisa: ", JSON.stringify(data));
         return Promise.resolve(this.mapResponse(data));
         //return Promise.resolve(powerupResponse); 
     }
@@ -291,7 +290,6 @@ export class GameService {
             })
         });
         let data = await res.json();
-        console.log("SC RESPONSE U SERVISU: ", JSON.stringify(data));
         return Promise.resolve(this.mapResponse(data));
         //return Promise.resolve(secondChanceResponse);       
     }
@@ -306,12 +304,10 @@ export class GameService {
             }
         });
         let data = await res.json();
-        console.log("SWITCH TASK RESPONSE U SERVISU: ", JSON.stringify(data));
         return Promise.resolve(this.mapResponse(data));
     }
 
     public async turnInTask(assignment: AssignmentDetails, testData: {total_tests: number; passed_tests: number}) : Promise<ServerResponse> {
-        console.log("DA VIDIMO STA JE BODY", JSON.stringify(testData));
         let requestURL = this.BASE_URL + `turnTaskIn&assignment_id=${assignment.id}`;
         let res = await fetch(requestURL, {
             method: "POST",
@@ -322,7 +318,6 @@ export class GameService {
             body: JSON.stringify(testData)
         });
         let data = await res.json();
-        console.log("WHAT THE FUCK IS THE RESPONSE: ", JSON.stringify(data));
         return Promise.resolve(this.mapResponse(data));
         /*return Promise.resolve({
             success:true,
@@ -392,7 +387,6 @@ export class GameService {
             credentials: "include"
         });
         let _data = await res.json();
-        console.log("blabla: ", JSON.stringify(_data));
         if(_data.success) {
             let data = _data.data;
         
@@ -456,7 +450,6 @@ export class GameService {
                 let powerupsUsedData = this.mapUsedPowerupData(data.powerups, powerupTypes, assignment.id);
                 let hint = "";
                 let previousPoints = -1;
-                console.log("CHECK 1");
                 if(_index != -1) {
                     let _tnIndex = powerupsUsedData.findIndex( (x: any) => { return x.name == 'Hint' && x.taskNumber == data.currentTasks[_index].task_number });
                     if(_tnIndex != -1) {
@@ -473,7 +466,6 @@ export class GameService {
                         else throw previousPointsResponse.message;
                     }
                 }
-                console.log("CHECK 2");
                 let _assignmentDetails : AssignmentDetails = {
                     id: assignment.id,
                     name: assignment.name,
@@ -493,7 +485,6 @@ export class GameService {
                     powerupsUsed : powerupsUsedData,
                     collapsed: false
                 }
-                console.log("CHECK 3");
                 assignments.push(_assignmentDetails);
             } else {
                 let _assignmentDetails : AssignmentDetails = {
