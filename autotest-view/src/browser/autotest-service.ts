@@ -230,6 +230,8 @@ export class AutotestService {
     }
 
     private async getResults(dirURI: string) {
+        console.log("Getting resutls...");
+
         const program = this.getProgram(dirURI);
 
         if (!program) {
@@ -256,8 +258,7 @@ export class AutotestService {
         if (program.status === ProgramStatus.PROGRAM_AWAITING_TESTS
             || program.status === ProgramStatus.PROGRAM_CURRENTLY_TESTING) {
             this.onTestsUpdateEmitter.fire({ program });
-            await this.delay(this.POLL_TIMEOUT_MS);
-            this.getResults(dirURI);
+            await this.delay(this.POLL_TIMEOUT_MS).then(() => this.getResults(dirURI));
             return;
         }
 
