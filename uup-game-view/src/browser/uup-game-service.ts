@@ -155,7 +155,7 @@ export class GameService {
             message: "",
             data: {}
         };
-       
+        
         if(!serverResponse.success) {
             response = {
                 success: serverResponse.success,
@@ -197,6 +197,7 @@ export class GameService {
             }
         })
         let data = await res.json();
+        console.log("u metodi servisa: ", JSON.stringify(data));
         return Promise.resolve(this.mapResponse(data));
         //return Promise.resolve(powerupResponse); 
     }
@@ -290,6 +291,7 @@ export class GameService {
             })
         });
         let data = await res.json();
+        console.log("SC RESPONSE U SERVISU: ", JSON.stringify(data));
         return Promise.resolve(this.mapResponse(data));
         //return Promise.resolve(secondChanceResponse);       
     }
@@ -304,6 +306,7 @@ export class GameService {
             }
         });
         let data = await res.json();
+        console.log("SWITCH TASK RESPONSE U SERVISU: ", JSON.stringify(data));
         return Promise.resolve(this.mapResponse(data));
     }
 
@@ -319,6 +322,7 @@ export class GameService {
             body: JSON.stringify(testData)
         });
         let data = await res.json();
+        console.log("WHAT THE FUCK IS THE RESPONSE: ", JSON.stringify(data));
         return Promise.resolve(this.mapResponse(data));
         /*return Promise.resolve({
             success:true,
@@ -452,21 +456,24 @@ export class GameService {
                 let powerupsUsedData = this.mapUsedPowerupData(data.powerups, powerupTypes, assignment.id);
                 let hint = "";
                 let previousPoints = -1;
+                console.log("CHECK 1");
                 if(_index != -1) {
                     let _tnIndex = powerupsUsedData.findIndex( (x: any) => { return x.name == 'Hint' && x.taskNumber == data.currentTasks[_index].task_number });
                     if(_tnIndex != -1) {
                         let hintResponse = await this.getUsedHint(assignment.id, data.currentTasks[_index].task_number);
-                        if(!hintResponse.success) {
+                        if(hintResponse.success) 
                             hint = hintResponse.data.hint;
-                        } else throw hintResponse.message;
+                        else throw hintResponse.message;
                     }
                     let _scIndex = powerupsUsedData.findIndex( (x: any) => { return x.name == 'Second Chance' && x.taskNumber == data.currentTasks[_index].task_number });
                     if(_scIndex != -1) {
                         let previousPointsResponse = await this.getPreviousPoints(assignment.id, data.currentTasks[_index].task_number);
-                        if(!previousPointsResponse.success)
+                        if(previousPointsResponse.success)
                             previousPoints = previousPointsResponse.data.points;
+                        else throw previousPointsResponse.message;
                     }
                 }
+                console.log("CHECK 2");
                 let _assignmentDetails : AssignmentDetails = {
                     id: assignment.id,
                     name: assignment.name,
@@ -486,6 +493,7 @@ export class GameService {
                     powerupsUsed : powerupsUsedData,
                     collapsed: false
                 }
+                console.log("CHECK 3");
                 assignments.push(_assignmentDetails);
             } else {
                 let _assignmentDetails : AssignmentDetails = {

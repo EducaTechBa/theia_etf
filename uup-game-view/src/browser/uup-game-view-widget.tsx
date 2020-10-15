@@ -224,6 +224,7 @@ export class UupGameViewWidget extends ReactWidget {
                 state.buyingPowerup = true;
             });
             const response = await this.gameService.buyPowerup(powerupType);
+            console.log("RESPONSE BUY POWERUPA: ", JSON.stringify(response));
             if(response.success) {
                 this.messageService.info(`Powerup '${powerupType.name}' successfully bought.`);
                 const index = this.state.studentData?.unusedPowerups.findIndex( (x: any) => { return x.name == powerupType.name; });
@@ -389,18 +390,19 @@ second chance available, choose wisely!`
             createdFolders = true;
         }
         const response = await this.gameService.useSecondChance(assignment, result);
+        console.log("RESPONSE NAKON SERVISA: ", JSON.stringify(response));
         if(response.success) {
             this.messageService.info(`Power-up 'Second Chance' has been used sucessfully.`);
-            this.messageService.info(`You are now back to task ${response.data.task_name} [Task ${response.data.task_number}].`);
+            this.messageService.info(`You are now back to task ${response.data.data.task_name} [Task ${response.data.data.task_number}].`);
             const index = this.state.studentData?.unusedPowerups.findIndex( (x: any) => { return x.name == 'Second Chance'; });
             this.state.studentData.unusedPowerups[index].amount -= 1;
             //Update current task
             assignment.currentTask = {
-                name: response.data.task_name,
-                taskNumber: response.data.task_number
+                name: response.data.data.task_name,
+                taskNumber: response.data.data.task_number
             };
             //Set previous points in assignments state
-            assignment.previousPoints = response.data.previous_points;
+            assignment.previousPoints = response.data.data.previous_points;
             //Update hint if existing
             assignment.taskHint = "";
             assignment.powerupsUsed.push({name: "Second Chance", taskNumber: assignment.currentTask.taskNumber});
@@ -450,6 +452,7 @@ second chance available, choose wisely!`
                     state.studentData.assignmentsData[index].buyingPowerUp = true;
             });
             const response = await this.gameService.switchTask(assignment);
+            console.log("SWITCH TASK POWERUP RESPONSE VAN SERVISA: ", JSON.stringify(response));
             if(response.success) {
                 this.messageService.info(`Power-up 'Switch Task' has been used successfully. New task files are now in your workspace. Good luck!`);
                 const index = this.state.studentData?.unusedPowerups.findIndex( (x: any) => { return x.name == 'Switch Task'; });
@@ -457,8 +460,8 @@ second chance available, choose wisely!`
                 //Update current assignment
                 assignment.powerupsUsed.push({name: "Switch Task", taskNumber: assignment.currentTask.taskNumber}); 
                 assignment.currentTask = {
-                    name: response.data.taskData.task_name,
-                    taskNumber: response.data.taskData.task_number
+                    name: response.data.data.taskData.task_name,
+                    taskNumber: response.data.data.taskData.task_number
                 }
                 assignment.previousPoints = -1;
                 assignment.taskHint = "";
@@ -550,8 +553,8 @@ second chance available, choose wisely!`
                     console.log(JSON.stringify(results));
                     //Testing purposes
                     results = {
-                        "passed_tests": 3,
-                        "total_tests": 3
+                        "passed_tests": 6,
+                        "total_tests": 9
                     }
                     const _dialog = new ConfirmDialog({
                         title: "Task turn in confirmation",
@@ -578,8 +581,8 @@ second chance available, choose wisely!`
                         assignment.tasksTurnedIn += 1;
                         //Update assignment and set state
                         assignment.currentTask = {
-                            name: response.data.taskData.task_name,
-                            taskNumber: response.data.taskData.task_number
+                            name: response.data.data.taskData.task_name,
+                            taskNumber: response.data.data.taskData.task_number
                         };
                         if(results.passed_tests === results.total_tests) {
                             assignment.tasksFullyFinished += 1;
@@ -594,18 +597,18 @@ second chance available, choose wisely!`
                             assignment.points -= assignment.previousPoints;
                             assignment.previousPoints = -1;
                         }
-                        assignment.points += response.data.points;
-                        this.state.studentData.points += response.data.points;
-                        this.state.studentData.tokens += response.data.tokens;
+                        assignment.points += response.data.data.points;
+                        this.state.studentData.points += response.data.data.points;
+                        this.state.studentData.tokens += response.data.data.tokens;
                         //Checking for additional tokens
-                        let _additionalTokens = response.data.additionalTokens;
-                        this.messageService.info(`You earned ${response.data.points*1000} XP and ${response.data.tokens} tokens.`);
+                        let _additionalTokens = response.data.data.additionalTokens;
+                        this.messageService.info(`You earned ${Math.floor(response.data.data.points*1000)} XP and ${response.data.data.tokens} tokens.`);
                         if(Object.keys(_additionalTokens).length !== 0 && _additionalTokens.constructor === Object) {
                             this.messageService.info(`Congratulations! You earned additional ${_additionalTokens.amount} tokens.
                             Reason: ${_additionalTokens.reason}`)
                             this.state.studentData.tokens += _additionalTokens.amount;
                         }
-                        if(response.data.assignmentDone) {
+                        if(response.data.data.assignmentDone) {
                             assignment.finished = true;
                             assignment.tasksTurnedIn = 15;
                             this.messageService.info(`Congratulations! You have completed all tasks in assignment '${assignment.name}.'`);
