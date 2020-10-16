@@ -106,6 +106,7 @@ export class AutotestViewWidget extends ReactWidget {
                 state.autotestResults = [];
                 state.statusMessage = 'This program has not been tested before.';
                 state.progressMessage = '';
+                state.isRunningTests = false;
             });
             return;
         }
