@@ -1,6 +1,6 @@
 {
     "task": {
-        "run": "/usr/local/webide/runners/universal_runner.sh ${file} ${fileDirname}" 
+        "run": "/usr/local/webide/runners/universal_runner.sh ${file} ${fileDirname} && echo" 
     },
     "children": {
         "UUP": {
