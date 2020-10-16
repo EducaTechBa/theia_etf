@@ -1,6 +1,6 @@
 {
     "task": {
-        "run": "sleep 1s && echo \"BlaBla\""
+        "run": "/usr/local/webide/runners/universal_runner.sh ${file} ${fileDirname}" 
     },
     "children": {
         "UUP": {
