@@ -47,9 +47,6 @@ export class TopBarWidget extends ReactWidget {
         this.editorManager.onCreated(editorWidget => this.handleEditorSwitch(editorWidget));
         this.editorManager.onActiveEditorChanged(editorWidget => this.handleEditorSwitch(editorWidget));
 
-
-        this.ping();
-
         this.update();
     }
 
@@ -132,22 +129,6 @@ export class TopBarWidget extends ReactWidget {
 
     private async handleLogoutButtonClick() {
         window.location.href = '/index.php?logout';
-    }
-
-    private async ping() {
-        const res = await fetch('/zamger/ping.php');
-        const data = await res.text();
-
-        console.log(data);
-
-        this.delay(60000).then(() => {
-            console.log("60000 ms later");
-            this.ping();
-        });
-    }
-
-    private delay(ms: number) {
-        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
 }
