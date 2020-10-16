@@ -6,6 +6,7 @@ import { bindViewContribution, FrontendApplicationContribution, WidgetFactory } 
 import '../../src/browser/style/index.css';
 import { HomeworkSubmit } from './homework-submit';
 import { TaskRunner } from './task-runner';
+import { SessionManager } from './session-manager';
 
 export default new ContainerModule(bind => {
     bindViewContribution(bind, TopBarContribution);
@@ -13,6 +14,7 @@ export default new ContainerModule(bind => {
     bind(TopBarWidget).toSelf();
     bind(HomeworkSubmit).toSelf().inSingletonScope();
     bind(TaskRunner).toSelf().inSingletonScope();
+    bind(SessionManager).toSelf().inSingletonScope();
     bind(WidgetFactory).toDynamicValue(ctx => ({
         id: TopBarWidget.ID,
         createWidget: () => ctx.container.get<TopBarWidget>(TopBarWidget)

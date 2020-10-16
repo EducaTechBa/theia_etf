@@ -1,23 +1,16 @@
 {
     "tasks": [
         {
-            "label": "hello",
-            "type": "shell",
-            "command": "sleep 1s && echo \"Hello World...\"",
-            "options": {
-                "cwd": "${fileDirname}"
-            }
-        },
-        {
             "label": "C - Build and Run",
             "type": "shell",
-            "command": "sleep 1s && gcc ${file} -o .${fileBasenameNoExtension} && ./.${fileBasenameNoExtension}",
+            "command": "gcc ${file} -o .${fileBasenameNoExtension} && ./.${fileBasenameNoExtension}",
             "problemMatcher": [],
             "options": {
                 "cwd": "${fileDirname}"
             },
             "presentation": {
                 "reveal": "always",
+                "echo": false,
                 "focus": true,
                 "panel": "dedicated",
                 "showReuseMessage": false,
@@ -27,16 +20,24 @@
         {
             "label": "C - Build",
             "type": "shell",
-            "command": "sleep 1 && gcc ${file} -o ${fileDirname}/.${fileBasenameNoExtension}",
+            "command": "sleep 1s && gcc ${file} -o ${fileDirname}/.${fileBasenameNoExtension}",
             "problemMatcher": [],
             "options": {
                 "cwd": "${fileDirname}"
+            },
+            "presentation": {
+                "reveal": "never",
+                "echo": true,
+                "focus": false,
+                "panel": "dedicated",
+                "showReuseMessage": false,
+                "clear": true
             }
         },
         {
             "label": "C - Build Debug",
             "type": "shell",
-            "command": "gcc -g ${file} -o ${fileDirname}/.${fileBasenameNoExtension}.dbg",
+            "command": "sleep 1s && gcc -g ${file} -o ${fileDirname}/.${fileBasenameNoExtension}.dbg",
             "problemMatcher": [],
             "options": {
                 "cwd": "${fileDirname}"
@@ -57,6 +58,22 @@
                 "cwd": "${fileDirname}"
             },
             "problemMatcher": []
+        },
+        {
+            "label": "C++ - Build Debug",
+            "type": "shell",
+            "command": "sleep 1s && g++ -g ${file} -o ${fileDirname}/.${fileBasenameNoExtension}.dbg",
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "presentation": {
+                "reveal": "always",
+                "focus": true,
+                "panel": "dedicated",
+                "showReuseMessage": false,
+                "clear": true
+            }
         }
     ]
 }

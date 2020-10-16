@@ -5,6 +5,8 @@ import { FileStatWithMetadata } from '@theia/filesystem/lib/common/files';
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
 import URI from '@theia/core/lib/common/uri';
+// @ts-ignore
+import { SessionManager } from 'top-bar/lib/browser/session-manager';
 
 interface AutotesterState {
     programs: Record<string, Program | undefined>
@@ -138,6 +140,7 @@ export class AutotestService {
         @inject(Autotester) private readonly autotester: Autotester,
         @inject(FileService) private readonly fileService: FileService,
         @inject(WorkspaceService) private readonly workspaceService: WorkspaceService,
+        @inject(SessionManager) private readonly sessionManager: SessionManager,
     ) { }
 
     public async runTests(dirURI: string, isUserInvoked: boolean): Promise<AutotestRunInfo> {
@@ -162,7 +165,8 @@ export class AutotestService {
 
         let program = this.getProgram(dirURI);
         if (!program) {
-            program = await this.createProgram(taskID, autotest.tests.length, dirURI, isUserInvoked);
+            const taskName = await this.resolveTaskName(dirURI);
+            program = await this.createProgram(taskID, taskName, autotest.tests.length, dirURI, isUserInvoked);
             this.state.programs[dirURI] = program;
         }
         program.isUserInvoked = isUserInvoked;
@@ -207,8 +211,14 @@ export class AutotestService {
         };
     }
 
-    private async createProgram(taskID: string, totalTests: number, uri: string, isUserInvoked: boolean): Promise<Program> {
-        const id = await this.autotester.setProgram(taskID);
+    private async resolveTaskName(dirURI: string): Promise<string> {
+        const userInfo = await this.sessionManager.getUserInfo();
+        const path = this.getPathInWorkspace(dirURI);
+        return `${userInfo.username}/${path}`;
+    }
+
+    private async createProgram(taskID: string, taskName: string, totalTests: number, uri: string, isUserInvoked: boolean): Promise<Program> {
+        const id = await this.autotester.setProgram(taskID, taskName);
         return {
             id,
             status: ProgramStatus.PROGRAM_AWAITING_TESTS,
@@ -273,7 +283,7 @@ export class AutotestService {
     public async cancelTests(dirURI: string, preventNonUserInvokedCancel: boolean = true): Promise<AutotestCancelStatus> {
         const program = this.getProgram(dirURI);
 
-        if(program === undefined) {
+        if (program === undefined) {
             return AutotestCancelStatus.NO_PROGRAM;
         }
 
@@ -321,9 +331,13 @@ export class AutotestService {
 
     public async hasAutotestsDefined(dirURI: string): Promise<boolean> {
         const uri = `${dirURI}/${this.AUTOTEST_FILENAME}`;
-        const workspaceUri = this.workspaceService.workspace?.resource.toString();
-        const trimmed = uri.slice(workspaceUri?.length);
+        const trimmed = await this.getPathInWorkspace(uri);
         return await this.workspaceService.containsSome([trimmed]);
+    }
+
+    private getPathInWorkspace(uri: string): string {
+        const workspaceUri = this.workspaceService.workspace?.resource.toString();
+        return uri.slice(workspaceUri?.length);
     }
 
     private async loadAutotestResultsFile(dirURI: string): Promise<string | undefined> {

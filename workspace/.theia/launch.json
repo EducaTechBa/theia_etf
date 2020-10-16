@@ -7,7 +7,31 @@
             "name": "C++ Debug",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${fileDirname}/.${fileBasenameNoExtension}",
+            "program": "${fileDirname}/.${fileBasenameNoExtension}.dbg",
+            "args": [],
+            "environment": [],
+            "preLaunchTask": "C++ - Build Debug",
+            "cwd": "${fileDirname}",
+            "debugConsole": "hide",
+            "console": "integratedTerminal",
+            "setupCommands": [
+                {
+                    "text": "-enable-pretty-printing",
+                    "description": "enable pretty printing",
+                    "ignoreFailures": false
+                },
+                {
+                    "text": "handle SIGPIPE nostop noprint pass",
+                    "description": "ignore SIGPIPE",
+                    "ignoreFailures": false
+                }
+            ]
+        },
+        {
+            "name": "C Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${fileDirname}/.${fileBasenameNoExtension}.dbg",
             "args": [],
             "environment": [],
             "preLaunchTask": "C - Build Debug",

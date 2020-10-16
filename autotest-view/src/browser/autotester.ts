@@ -32,8 +32,8 @@ export class Autotester {
         return data.data;
     }
 
-    public async setProgram(taskID: string): Promise<string> {
-        const program = { task: taskID, name: '' };
+    public async setProgram(taskID: string, taskName: string): Promise<string> {
+        const program = { task: taskID, name: taskName };
         const programQuery = encodeURIComponent(JSON.stringify(program));
         const url = this.makeURL('setProgram', '');
 
@@ -53,7 +53,9 @@ export class Autotester {
         const url = this.makeURL('setProgramFile', `id=${programID}`);
 
         const zip = new JSZip();
-        files.forEach(file => zip.file(file.name, file.content));
+        const nonHiddenFiles = files.filter(file => file.name[0] !== '.');
+        nonHiddenFiles
+            .forEach(file => zip.file(file.name, file.content));
         const content = await zip.generateAsync({ type: 'blob' });
 
         const formData = new FormData();
