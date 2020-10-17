@@ -1,8 +1,7 @@
 import { injectable } from 'inversify';
 
-// {"success":true,"message":"You are logged in","username":"rfejzic1","sid":"pvrgajjkt7otdcootbc897bq96","role":"admin"}
-
 export interface UserInfo {
+    success: boolean;
     username: string;
     sid: string;
     role: string;
@@ -37,10 +36,12 @@ export class SessionManager {
 
         console.log(data);
 
-        this.delay(60000).then(() => {
-            console.log("60000 ms later");
-            this.ping();
-        });
+        if(data.includes("ERROR")) {
+            window.location.href = '/';
+            return;
+        }
+
+        this.delay(10000).then(() => this.ping());
     }
 
     private delay(ms: number) {
