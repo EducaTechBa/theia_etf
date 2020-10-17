@@ -4,18 +4,19 @@ import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core';
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
 import { Assignment, PowerupType, StudentData, GameService, ChallengeConfig, AssignmentDetails, TaskCategory, UsedPowerup, CourseInfo, Task} from './uup-game-service';
-import { ConfirmDialog } from '@theia/core/lib/browser';
+import { ConfirmDialog, open, OpenerService } from '@theia/core/lib/browser';
 import { SelectDialog } from './select-dialogue';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
 import URI from '@theia/core/lib/common/uri';
 import { AutotestService, AutotestEvent } from 'autotest-view/lib/browser/autotest-service';
 import { GameHelpDialog } from './game-help-dialogue';
-
+import { FileChangeType } from '@theia/filesystem/lib/common/files';
 import { MiniBrowserOpenHandler } from '@theia/mini-browser/lib/browser/mini-browser-open-handler';
 
 
 interface GameInformationState {
-    handlers: Record<string, boolean>
+    handlers: Record<string, boolean>;
+    fileWatchers: Record<string, boolean>;
     storeOpen: boolean;
     buyingPowerup: boolean;
     assignments: Assignment[];
@@ -45,15 +46,16 @@ export class UupGameViewWidget extends ReactWidget {
 
     @inject(AutotestService)
     protected readonly autotestService: AutotestService;
-/*
+
     @inject(OpenerService)
     protected readonly openerService: OpenerService;
-*/
+
     @inject(MiniBrowserOpenHandler)
-    protected readonly miniBrowserOpenHanlder: MiniBrowserOpenHandler;
+    protected readonly miniBrowserOpenHandler: MiniBrowserOpenHandler;
 
     private state: GameInformationState = {
         handlers: {},
+        fileWatchers: {},
         storeOpen: false,
         buyingPowerup: false,
         assignments: [],
@@ -122,16 +124,20 @@ export class UupGameViewWidget extends ReactWidget {
         if(!directoryExists)
             await this.fileService.createFolder(new URI(gameDirectoryURI));
 
+        this.fileService.watch
+
         const _assignments = await this.gameService.getAssignments();
         const _powerupTypes = await this.gameService.getPowerupTypes();
         const _challengeConfig = await this.gameService.getChallengeConfig();
         const _taskCategories = await this.gameService.getTaskCategories();
         const _studentData = await this.gameService.getStudentData(_assignments, _powerupTypes, _challengeConfig?.tasksRequired);
         const _handlers = this.generateEmptyHandlers(_assignments);
+        const _fileWatchers = this.generateWatchers(_assignments);
         return {
             storeOpen: false,
             buyingPowerup: false,
             handlers: _handlers,
+            fileWatchers: _fileWatchers,
             assignments: _assignments,
             powerupTypes: _powerupTypes,
             challengeConfig: _challengeConfig,
@@ -143,6 +149,50 @@ export class UupGameViewWidget extends ReactWidget {
     private setState(update: (state: GameInformationState) => void) {
         update(this.state);
         this.update();
+    }
+
+    private generateWatchers(assignments: Assignment[]) : Record<string, boolean> {
+        assignments = assignments.filter( (x) => { return x.active;});
+        let fileWatchers : Record<string, boolean> = {};
+        assignments.forEach( (x: Assignment) => { 
+            fileWatchers[x.name] = true;
+            this.createChangeEventListener(x);
+        });
+        return fileWatchers;
+    }
+
+    private createChangeEventListener(assignment : Assignment) {
+        let uri = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME/${assignment.name}`);
+        //let taskSpecificationURI = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME/${assignment.name}/task.html`);
+        //let _taskSpecificationURI = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME/${assignment.name}/task.jpg`);
+        //let taskSolutionFileURI = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME/${assignment.name}/main.c`);
+        this.fileService.onDidFilesChange( async (e) => {
+            if(e.contains(uri, FileChangeType.UPDATED)) {
+                let resolve = await this.fileService.resolve(uri);
+                console.log("Event e: ", e);
+                if(resolve.children?.length) {
+                    for(const file of resolve.children) {
+                        if(file.isDirectory || file.name[0]==='.')
+                            continue;
+                        else if(file.name.match(/.+\.c$/))
+                            open(this.openerService, file.resource);
+                        else if(file.name.match(/.+\.html$/))
+                            this.miniBrowserOpenHandler.open(file.resource);                        
+                    }
+                }
+            }
+            /*if(e.contains(taskSpecificationURI, FileChangeType.ADDED)) {
+                console.log("Uhvatio task.html pri kreiranju");
+                this.miniBrowserOpenHandler.open(taskSpecificationURI);                
+            }
+            else if(e.contains(_taskSpecificationURI, FileChangeType.ADDED)) {
+                console.log("Uhvatio task.jpg pri kreiranju");
+                this.miniBrowserOpenHandler.open(_taskSpecificationURI);
+            }
+            else if(e.contains(taskSolutionFileURI, FileChangeType.ADDED))
+                console.log("Uhvatio main.c pri kreiranju");
+                open(this.openerService, taskSolutionFileURI);*/
+        });
     }
 
     private async getStudentCoursesInfo(): Promise<CourseInfo[]> {
@@ -550,7 +600,7 @@ second chance available, choose wisely!`
                     console.log(JSON.stringify(results));
                     //Testing purposes
                     results = {
-                        "passed_tests": 10,
+                        "passed_tests": 9,
                         "total_tests": 10
                     }
                     const _dialog = new ConfirmDialog({
@@ -644,13 +694,13 @@ second chance available, choose wisely!`
     private openGameHelpDialog() {
         new GameHelpDialog({title:"UUP GAME INFORMATION & HELP"}).open();
     }
-/*
+
     private async openGameRules() {
-        let uri = new URI(this.workspaceService.workspace?.resource+'/UUP_GAME/Lesson 1/nesto.html');
+        let uri = new URI(this.workspaceService.workspace?.resource+'/UUP_GAME/Lesson 1/task.html');
         //open(this.openerService, uri, { preview: 'true' } );
-        this.miniBrowserOpenHanlder.open(uri);
+        this.miniBrowserOpenHandler.open(uri);
     }
-  */  
+    
     protected render(): React.ReactNode {  
         let content;
         if(!this.studentCheck) {
@@ -728,7 +778,7 @@ second chance available, choose wisely!`
             progress = 100;
             xp = 1000;
         }
-        /* <span className="game-rules"><a href="" onClick= { () => { this.openGameRules()} }>GAME RULES</a></span> */
+        /*  */
         return <div className='student-info'>
             <div className="student-header">
                 <span>{header}</span>
@@ -738,7 +788,7 @@ second chance available, choose wisely!`
                     <i className="fa fa-info-circle" aria-hidden="true"></i>
                 </button>
             </div>
-            
+            <span className="game-rules"><a href="#" onClick= { (e) => {e.preventDefault(); this.openGameRules()} }>GAME RULES</a></span>
             <span className="student-level">Level: {level}</span>
             <div className="progress-bar">
                     <span className="progress-bar-span">{progress.toFixed(2)}%</span>
