@@ -66,7 +66,7 @@ export class AutotestViewWidget extends ReactWidget {
         this.editorManager.onActiveEditorChanged(editorWidget => this.handleEditorSwitch(editorWidget));
 
         const initialActiveEditor = this.getInitialActiveEditor();
-        if(initialActiveEditor) {
+        if (initialActiveEditor) {
             this.handleEditorSwitch(initialActiveEditor)
         }
     }
@@ -191,7 +191,7 @@ export class AutotestViewWidget extends ReactWidget {
     }
 
     private async handleButtonClick() {
-        if(this.state.isRunningTests) {
+        if (this.state.isRunningTests) {
             console.log("Canceling tests...");
             await this.handleCancelTests();
         } else {
@@ -205,7 +205,6 @@ export class AutotestViewWidget extends ReactWidget {
             return;
         }
 
-        this.messageService.info(`Opening 'Test ${taskID}' results...`);
         await this.autotestService.openResultsPage(this.state.programDirectoryURI, taskID);
     }
 
@@ -254,15 +253,15 @@ export class AutotestViewWidget extends ReactWidget {
     }
 
     private async handleCancelTests() {
-        if(this.state.programDirectoryURI === undefined) {
+        if (this.state.programDirectoryURI === undefined) {
             return;
         }
 
         const runningStatus = await this.autotestService.cancelTests(this.state.programDirectoryURI);
-        if(runningStatus === AutotestCancelStatus.NOT_USER_INVOKED) {
+        if (runningStatus === AutotestCancelStatus.NOT_USER_INVOKED) {
             this.messageService.info("Could not cancel tests not invoked by user");
             return;
-        } else if(runningStatus === AutotestCancelStatus.NO_PROGRAM) {
+        } else if (runningStatus === AutotestCancelStatus.NO_PROGRAM) {
             return;
         }
 

@@ -166,7 +166,8 @@ export class AutotestService {
         let program = this.getProgram(dirURI);
         if (!program) {
             const taskName = await this.resolveTaskName(dirURI);
-            program = await this.createProgram(taskID, taskName, autotest.tests.length, dirURI, isUserInvoked);
+            const nonSilentAutotests = autotest.tests.filter((test: any) => !(test.options && test.options.includes('silent')));
+            program = await this.createProgram(taskID, taskName, nonSilentAutotests.length, dirURI, isUserInvoked);
             this.state.programs[dirURI] = program;
         }
         program.isUserInvoked = isUserInvoked;
