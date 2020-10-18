@@ -1,5 +1,5 @@
 import { injectable, inject, postConstruct } from 'inversify';
-import { MenuModelRegistry } from '@theia/core';
+import { MenuModelRegistry, MessageService } from '@theia/core';
 import { TopBarWidget } from './top-bar-widget';
 import { AbstractViewContribution } from '@theia/core/lib/browser';
 import { Command, CommandRegistry } from '@theia/core/lib/common/command';
@@ -10,8 +10,12 @@ import { MaybePromise } from '@theia/core/lib/common/types';
 import { TerminalMenus, TerminalCommands } from '@theia/terminal/lib/browser/terminal-frontend-contribution';
 import { DebugSessionManager } from '@theia/debug/lib/browser/debug-session-manager';
 import { TerminalService } from '@theia/terminal/lib/browser/base/terminal-service';
+import { CommonMenus } from '@theia/core/lib/browser';
+import { FeedbackDialog } from './feedback-dialog';
 
 export const TopBarCommand: Command = { id: 'top-bar:command' };
+
+export const FeedbackCommand: Command = { id: 'feedback:command', label: 'Feedback' };
 
 @injectable()
 export class TopBarContribution extends AbstractViewContribution<TopBarWidget> implements FrontendApplicationContribution {
@@ -27,6 +31,9 @@ export class TopBarContribution extends AbstractViewContribution<TopBarWidget> i
 
     @inject(TerminalService)
     protected readonly terminalService: TerminalService;
+
+    @inject(MessageService)
+    protected readonly messageService: MessageService;
 
     constructor() {
         super({
@@ -54,6 +61,10 @@ export class TopBarContribution extends AbstractViewContribution<TopBarWidget> i
             execute: () => super.openView({ reveal: true })
         });
 
+        commands.registerCommand(FeedbackCommand, {
+            execute: () => this.openFeedbackDialog()
+        });
+
         const terminalCommands = Object.entries(TerminalCommands);
         terminalCommands
             .forEach(([_, cmd]: [string, Command]) =>
@@ -72,7 +83,9 @@ export class TopBarContribution extends AbstractViewContribution<TopBarWidget> i
     }
 
     registerMenus(menus: MenuModelRegistry): void {
-        super.registerMenus(menus);
+        menus.registerMenuAction(CommonMenus.HELP, {
+            commandId: FeedbackCommand.id
+        })
 
         menus.unregisterMenuNode(TerminalMenus.TERMINAL[1]);
     }
@@ -84,4 +97,12 @@ export class TopBarContribution extends AbstractViewContribution<TopBarWidget> i
             );
         }
     }
+
+    private async openFeedbackDialog() {
+        const dialog = new FeedbackDialog();
+        const res = await dialog.open();
+        if(res) {
+            this.messageService.info("Successfully submited feedback!");
+        }
+    };
 }

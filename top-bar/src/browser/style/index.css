@@ -15,3 +15,11 @@
 .not-homework {
     display: none;
 }
+
+.button-bar {
+    float: right;
+}
+
+.button-bar::after {
+    clear: both;
+}
