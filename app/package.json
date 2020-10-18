@@ -30,7 +30,9 @@
     "@theia/workspace": "1.6.0",
     "assignments-view": "0.0.0",
     "autotest-view": "0.0.0",
-    "top-bar": "0.0.0"
+    "react-select": "^3.1.0",
+    "top-bar": "0.0.0",
+    "uup-game-view": "0.0.0"
   },
   "devDependencies": {
     "@theia/cli": "latest"
@@ -39,7 +41,7 @@
     "prepare": "yarn run clean && yarn build && yarn run download:plugins",
     "prepare-dev": "yarn run clean && yarn build-dev && yarn run download:plugins",
     "clean": "theia clean",
-    "build": "theia build --mode production",
+    "build": "theia build --mode development",
     "build-dev": "theia build --mode development",
     "download:plugins": "theia download:plugins",
     "start": "theia start --plugins=local-dir:plugins",

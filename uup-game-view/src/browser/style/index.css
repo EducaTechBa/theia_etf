@@ -1,0 +1,238 @@
+#widget-container h2 {
+    color: var(--theia-ui-font-color1);
+    font-size: 12px;
+    font-weight: 400;
+    padding: 10px;
+    text-transform: uppercase;
+}
+
+#uup-game-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-items: flex-start;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.student-info {
+    display:flex;
+    width: 100%;
+    flex-direction: column;
+}
+
+.assignments-list, .powerup-list {
+    list-style: none;
+    padding: 0px;
+    margin-top: 0 !important;
+    width: 100%;
+}
+
+.powerup-store {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.powerup-store-content {
+    display:flex;
+    flex-direction: column;
+    text-align: center;
+    padding-top: 10px;
+    margin: 0px 10px 10px 10px; 
+}
+
+.powerup-item {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    margin-bottom: 2px;
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+.powerup-item-name {
+    display: inline-flex;
+    align-items: center;
+}
+
+.powerup-item i {
+    width:15px;
+}
+
+
+.assignment-header, .powerups-header {
+    line-height: var(--theia-view-container-title-height);
+    display: flex;
+    text-transform: uppercase;
+    align-items: center;
+    font-size: var(--theia-ui-font-size0);
+    font-weight: 450;
+    color: var(--theia-sideBarSectionHeader-foreground);
+    background: var(--theia-sideBarSectionHeader-background);
+    margin-bottom: 2px;
+}
+
+.progress-bar {
+    margin: 10px;
+    background: var(--theia-sideBarSectionHeader-background);
+}
+
+.progress-bar-span {
+    position: absolute;
+    left: 47%;
+    padding-top:2px;
+    color: white;
+}
+
+.assignment-locked {
+    display: inline-block;
+    text-align: justify;
+    padding-top:10px;
+    margin: 0px 10px 10px 10px;
+    color: #f14c4c;
+}
+
+.assignment-started, .assignment-finished {
+    display: flex;
+    flex-direction: column;
+    text-align: justify;
+    padding-top:10px;
+    margin: 0px 10px 10px 10px;
+}
+
+.start-assignment-button,.af-second-chance-button {
+    margin-left: 0px !important;
+    margin-top: 10px;
+}
+
+.assignment-progress {
+    display:inline-block;
+    text-align: center;
+    width: 100%;
+    padding-top: 10px; 
+}
+
+.student-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 450;
+    font-size: 1.3em;
+    margin: 10px;
+}
+
+.helpDialogButton {
+    min-width: auto !important;
+}
+
+.game-rules {
+    display: inline-block;
+    text-align: center;
+    width: 100%;
+}
+
+.student-level {
+    display: inline-block;
+    text-align: center;
+    width: 100%;
+    padding-top: 20px;
+}
+
+.student-xp {
+    display: inline-block;
+    text-align: center;
+    width: 100%;
+}
+
+
+table.powerups-table {
+    margin: 10px;
+    border-spacing: 2px;
+    border-collapse: separate;
+}
+
+table.powerups-table td {
+    background: var(--theia-sideBarSectionHeader-background);
+    text-align: center;
+    padding: 7px;
+}
+
+.powerup-button {
+    margin: 2px !important;
+    width: 33%;
+}
+
+.selectDialogueMessage {
+    white-space: pre-wrap;
+    text-align: justify !important;
+    color: white;
+    margin-bottom:10px;
+}
+
+.selectDialogueDropdown {
+    background-color: var(--theia-secondaryButton-background);
+    color: white;
+    font-size: 1em;
+}
+
+.powerup-button-turn-in {
+    margin: 2px !important;
+    width: 100%;
+    margin-bottom: 10px !important;
+}
+
+.theia-alert-message-container {
+    padding: 10px 5px !important;
+}
+
+.p-Widget.dialogOverlay select {
+    background: var(--theia-secondaryButton-background);
+}
+
+.p-Widget.dialogOverlay option {
+    background: var(--theia-secondaryButton-background);
+}
+
+tr:first-child { font-size: 1.5em; }
+tr:first-child td:first-child { border-top-left-radius: 10px;}
+tr:first-child td:last-child { border-top-right-radius: 10px;}
+tr:last-child td:first-child { border-bottom-left-radius: 10px;}
+tr:last-child td:last-child { border-bottom-right-radius: 10px;}
+
+.assignment-content {
+    display:flex;
+    flex-direction: column;
+    margin: 0px 10px 10px 10px;
+}
+
+.powerups-buttons {
+    display: flex;
+    flex-direction: row;
+    margin: 0px 10px 1px 10px;
+}
+
+
+.assignment-conent .span {
+    margin-bottom: 2px;
+}
+
+.progress-bar-green {
+    height: 20px;
+    background-color: #168c5c;
+}
+
+.progress-bar-xp {
+    height: 20px;
+    background-color: #802b82;
+}
+
+.collapse {
+    display:none;
+}
+
+.collapse.in {
+    display:block;
+}
+

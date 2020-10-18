@@ -9,6 +9,6 @@
     "lerna": "2.4.0"
   },
   "workspaces": [
-    "top-bar", "autotest-view", "assignments-view", "app"
+    "uup-game-view", "top-bar", "autotest-view", "assignments-view", "app"
   ]
 }
