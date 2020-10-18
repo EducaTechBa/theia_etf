@@ -126,8 +126,6 @@ export class UupGameViewWidget extends ReactWidget {
         if(!directoryExists)
             await this.fileService.createFolder(new URI(gameDirectoryURI));
 
-        this.fileService.watch
-
         const _assignments = await this.gameService.getAssignments();
         const _powerupTypes = await this.gameService.getPowerupTypes();
         const _challengeConfig = await this.gameService.getChallengeConfig();
