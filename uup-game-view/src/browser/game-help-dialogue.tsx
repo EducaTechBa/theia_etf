@@ -27,8 +27,6 @@ export class GameHelpDialog extends ReactDialog<void> {
 
     @postConstruct()
     protected async init(): Promise<void> {
-        //this.applicationInfo = await this.appServer.getApplicationInfo();
-        //this.extensionsInfos = await this.appServer.getExtensionsInfos();
         this.update();
     }
 

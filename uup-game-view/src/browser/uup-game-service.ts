@@ -102,7 +102,7 @@ export interface CourseInfo {
 @injectable()
 export class GameService {
     
-    private BASE_URL = "http://34.69.254.181/services/uup_game.php?action="
+    private BASE_URL = "/services/uup_game.php?action="
 
     public async getAssignments() : Promise<Assignment[]> {
         let requestURL = this.BASE_URL +`getAssignments`;
@@ -146,9 +146,9 @@ export class GameService {
     /*
     private async delay(ms: number) {
         return new Promise(resolve => setTimeout(resolve, ms));
-    }*/
+    }
+    */
 
-    //TODO: uradit ovo kako treba...
     private mapResponse(serverResponse: any) : ServerResponse  {
         let response = {
             success: false,
@@ -172,22 +172,6 @@ export class GameService {
     }
 
     public async buyPowerup(powerupType: PowerupType) : Promise<ServerResponse> {
-        /*let powerupResponse = {
-            success: false,
-            message: "",
-            powerupType: "1",
-            price: 0,
-            tokens: 0
-        };
-        await this.delay(5000).then( ()=> {
-            powerupResponse = {
-                "success": true,
-                "message": "Powerup added to student mmesihovic1",
-                "powerupType": "1",
-                "price": 60,
-                "tokens": 75
-            };
-        });   */
         let requestURL = this.BASE_URL + `buyPowerUp&type_id=${powerupType.id}`;
         let res = await fetch(requestURL, {
             method: "POST",
@@ -198,7 +182,6 @@ export class GameService {
         })
         let data = await res.json();
         return Promise.resolve(this.mapResponse(data));
-        //return Promise.resolve(powerupResponse); 
     }
 
     public async startAssignment(assignment: AssignmentDetails) : Promise<ServerResponse> {
@@ -212,36 +195,9 @@ export class GameService {
         });
         let data = await res.json();
         return Promise.resolve(this.mapResponse(data));
-      /*  return Promise.resolve({
-            success: true,
-            message: "Assignment successfully started.",
-            data: {
-                "message": "Assignment successfully started.",
-                "taskData": {
-                    "task_number": 1,
-                    "task_name": "Task 260"
-                }
-            }
-        });*/
     } 
 
-    public async useHint(assignment: AssignmentDetails) : Promise<ServerResponse> {
-       /* let hintResponse = {
-            success: false,
-            message: "",
-            data: {}
-        }
-        await this.delay(5000).then( () => {
-            hintResponse = {
-                success: true,
-                message: "nije bitno",
-                data: {
-                    hint: "Testni hint za neki zadatak",
-                    tokens: 70,
-                }
-            };
-        });*/
-        
+    public async useHint(assignment: AssignmentDetails) : Promise<ServerResponse> {        
         let requestURL = this.BASE_URL + `hint&assignment_id=${assignment.id}`;
         let res = await fetch(requestURL, {
             method: "POST",
@@ -252,31 +208,9 @@ export class GameService {
         });
         let data = await res.json();
         return Promise.resolve(this.mapResponse(data));
-        //return Promise.resolve(hintResponse);
     }
 
     public async useSecondChance(assignment: AssignmentDetails, task: Task) : Promise<ServerResponse> {
-      /*  let secondChanceResponse = {
-            success: false,
-            message: "",
-            data: {
-                task_name: "",
-                task_number: 0,
-                previous_points: -1
-            } 
-        }
-        await this.delay(5000).then( () => {
-            secondChanceResponse = {
-                success: false,
-                message: "Second chance uspio",
-                data: {
-                    task_name: "Testni zadatak 3",
-                    task_number: 3,
-                    previous_points: 0.15
-                }
-            };
-        });*/
-        
         let requestURL = this.BASE_URL + `secondChance&assignment_id=${assignment.id}`;
         let res = await fetch(requestURL, {
             method: "POST",
@@ -291,7 +225,6 @@ export class GameService {
         });
         let data = await res.json();
         return Promise.resolve(this.mapResponse(data));
-        //return Promise.resolve(secondChanceResponse);       
     }
 
     public async switchTask(assignment: AssignmentDetails) : Promise<ServerResponse> {
@@ -319,20 +252,6 @@ export class GameService {
         });
         let data = await res.json();
         return Promise.resolve(this.mapResponse(data));
-        /*return Promise.resolve({
-            success:true,
-            message: "Current task for student mmesihovic1 in given assignment has been been turned in successfully.",
-            data:  {
-                "assignmentDone": false,
-                "points": 0.2,
-                "tokens": 20,
-                "additionalTokens": {},
-                "taskData": {
-                    "task_number": 234,
-                    "task_name": "Assignment finished"
-                }
-            }
-        })*/
     }
 
     public async getSecondChanceAvailableTasks(assignment: AssignmentDetails, type_id: number) : Promise<ServerResponse> {
@@ -343,23 +262,9 @@ export class GameService {
         });
         let data = await res.json();
         return Promise.resolve(this.mapResponse(data));
-       /* return Promise.resolve([{
-            "name": "Testni task 1",
-            "taskNumber": 1
-        },
-        {
-            "name": "Testni task 3",
-            "taskNumber": 3
-        },
-        {
-            "name": "Testni task 4",
-            "taskNumber": 4
-        }]
-        );*/
     }
 
     public async getUsedHint(assignment_id : number, taskNumber: number) : Promise<ServerResponse> {
-
         let requestURL = this.BASE_URL + `getUsedHint&assignment_id=${assignment_id}&task_number=${taskNumber}`;
         let res = await fetch(requestURL, {
             method: "GET",
@@ -377,7 +282,6 @@ export class GameService {
         });
         let data = await res.json();
         return Promise.resolve(this.mapResponse(data)); 
-        //return Promise.resolve(0.15);
     }
 
     public async getStudentData(assignments: Assignment[], powerupTypes: PowerupType[], taskRequirement: number) : Promise<StudentData> {

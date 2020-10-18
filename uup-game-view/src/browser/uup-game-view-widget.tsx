@@ -96,7 +96,7 @@ export class UupGameViewWidget extends ReactWidget {
         }
         try {
             if(this.studentCheck) {
-                this.messageService.info("Started initializiing game information state");
+                this.messageService.info("Started initializing game information state");
                 const _initialState = await this.initializeGameInformationState();
                 this.setState(state => {
                     state.handlers = _initialState.handlers;
@@ -156,20 +156,20 @@ export class UupGameViewWidget extends ReactWidget {
         let fileWatchers : Record<string, boolean> = {};
         assignments.forEach( (x: Assignment) => { 
             fileWatchers[x.name] = true;
-            this.createChangeEventListener(x);
+            this.createChangeEventListener(x.name);
         });
         return fileWatchers;
     }
 
-    private createChangeEventListener(assignment : Assignment) {
-        let uri = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME/${assignment.name}`);
+    private createChangeEventListener(name : string) {
+        let uri = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME/${name}`);
         //let taskSpecificationURI = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME/${assignment.name}/task.html`);
         //let _taskSpecificationURI = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME/${assignment.name}/task.jpg`);
         //let taskSolutionFileURI = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME/${assignment.name}/main.c`);
         this.fileService.onDidFilesChange( async (e) => {
+
             if(e.contains(uri, FileChangeType.UPDATED)) {
                 let resolve = await this.fileService.resolve(uri);
-                console.log("Event e: ", e);
                 if(resolve.children?.length) {
                     for(const file of resolve.children) {
                         if(file.isDirectory || file.name[0]==='.')
@@ -181,17 +181,6 @@ export class UupGameViewWidget extends ReactWidget {
                     }
                 }
             }
-            /*if(e.contains(taskSpecificationURI, FileChangeType.ADDED)) {
-                console.log("Uhvatio task.html pri kreiranju");
-                this.miniBrowserOpenHandler.open(taskSpecificationURI);                
-            }
-            else if(e.contains(_taskSpecificationURI, FileChangeType.ADDED)) {
-                console.log("Uhvatio task.jpg pri kreiranju");
-                this.miniBrowserOpenHandler.open(_taskSpecificationURI);
-            }
-            else if(e.contains(taskSolutionFileURI, FileChangeType.ADDED))
-                console.log("Uhvatio main.c pri kreiranju");
-                open(this.openerService, taskSolutionFileURI);*/
         });
     }
 
@@ -273,7 +262,6 @@ export class UupGameViewWidget extends ReactWidget {
                 state.buyingPowerup = true;
             });
             const response = await this.gameService.buyPowerup(powerupType);
-            console.log("RESPONSE BUY POWERUPA: ", JSON.stringify(response));
             if(response.success) {
                 this.messageService.info(`Powerup '${powerupType.name}' successfully bought.`);
                 const index = this.state.studentData?.unusedPowerups.findIndex( (x: any) => { return x.name == powerupType.name; });
@@ -316,6 +304,10 @@ export class UupGameViewWidget extends ReactWidget {
         //Create directory if it does not exist
         if (!directoryExists) {
             await this.fileService.createFolder(new URI(assignmentDirectoryURI));
+            if(!this.state.fileWatchers[assignment.name]) {
+                this.state.fileWatchers[assignment.name] = true;
+                this.createChangeEventListener(assignment.name);
+            }
         }  
         //Call service to start asssignment and get a response
         const response = await this.gameService.startAssignment(assignment);
@@ -341,9 +333,7 @@ export class UupGameViewWidget extends ReactWidget {
         const dialog = new ConfirmDialog({
             title: "Use power-up confirmation",
             maxWidth: 500,
-            msg: `Are you sure you want to use powerup 'Hint' on current task in this assignment?
-            This hint will be permanently visible while you are working on this task,
-            even if you return to it using power-up 'Second Chance'.`,
+            msg: `Are you sure you want to use powerup 'Hint' on current task in this assignment? This hint will be permanently visible while you are working on this task, even if you return to it using power-up 'Second Chance'.`,
             ok: "Yes",
             cancel: "No"
         });
@@ -414,12 +404,7 @@ export class UupGameViewWidget extends ReactWidget {
             label: task => `${task.taskNumber}. ${task.name}`,
             title: 'Use power-up confirmation',
             maxWidth: 500,
-            message: `Are you sure you want to use 'Second Chance' power up?
-You can only return to tasks you haven't fully finished. All 
-progress on current task will be saved. You can only return to 
-specific task once, if you make changes you need to turn it in
-before using this power-up again, else all progress will be lost. Below is a list of tasks with
-second chance available, choose wisely!`
+            message: `Are you sure you want to use 'Second Chance' power up? You can only return to tasks you haven't fully finished. All progress on current task will be saved. You can only return to specific task once, if you make changes you need to turn it in before using this power-up again, else all progress will be lost. Below is a list of tasks with second chance available, choose wisely!`
         }).open();
         if(!result) 
             return;    
@@ -433,11 +418,10 @@ second chance available, choose wisely!`
         //If assignment is already finished, we need to regenerate folders for it
         if(assignment.finished) {
             this.messageService.info(`Using 'Second Chance' power-up on finished assignment detected. Regenerating required resources.`);
-            this.generateAssignmentFiles(assignment);
+            await this.generateAssignmentFiles(assignment);
             createdFolders = true;
         }
         const response = await this.gameService.useSecondChance(assignment, result);
-        console.log("RESPONSE NAKON SERVISA: ", JSON.stringify(response));
         if(response.success) {
             this.messageService.info(`Power-up 'Second Chance' has been used sucessfully.`);
             this.messageService.info(`You are now back to task ${response.data.data.task_name} [Task ${response.data.data.task_number}].`);
@@ -467,6 +451,7 @@ second chance available, choose wisely!`
             this.messageService.error(response.message);
             if(createdFolders) {
                 this.removeAssignmentFiles(assignment);
+                createdFolders = false;
             }
         }
         this.setState(state => {
@@ -485,8 +470,7 @@ second chance available, choose wisely!`
         const dialog = new ConfirmDialog({
             title: "Use power-up confirmation",
             maxWidth: 500,
-            msg: `Are you sure you want to use powerup 'Switch Task' on current task in this assignment?
-            This will result in new task being selected from tasks database and assigned to you.`,
+            msg: `Are you sure you want to use powerup 'Switch Task' on current task in this assignment? This will result in new task being selected from tasks database and assigned to you.`,
             ok: "Yes",
             cancel: "No"
         });
@@ -499,7 +483,6 @@ second chance available, choose wisely!`
                     state.studentData.assignmentsData[index].buyingPowerUp = true;
             });
             const response = await this.gameService.switchTask(assignment);
-            console.log("SWITCH TASK POWERUP RESPONSE VAN SERVISA: ", JSON.stringify(response));
             if(response.success) {
                 this.messageService.info(`Power-up 'Switch Task' has been used successfully. New task files are now in your workspace. Good luck!`);
                 const index = this.state.studentData?.unusedPowerups.findIndex( (x: any) => { return x.name == 'Switch Task'; });
@@ -532,6 +515,10 @@ second chance available, choose wisely!`
 
         if (!directoryExists) {
             await this.fileService.createFolder(new URI(assignmentDirectoryURI));
+            if(!this.state.fileWatchers[assignment.name]) {
+                this.state.fileWatchers[assignment.name] = true;
+                this.createChangeEventListener(assignment.name);
+            }
         }
     }
 
@@ -542,6 +529,7 @@ second chance available, choose wisely!`
 
         if (directoryExists) {
             await this.fileService.delete(new URI(assignmentDirectoryURI), { recursive:true });
+            this.state.fileWatchers[assignment.name] = false;
         }
     }
 
@@ -550,6 +538,15 @@ second chance available, choose wisely!`
         if(index == this.state.studentData.assignmentsData.length-1)
             return;
         this.state.studentData.assignmentsData[index+1].unlocked = true;
+    }
+
+    private createHtmlNode(type: string, message: string) : HTMLElement {
+        const htmlNode = document.createElement(type);
+        htmlNode.setAttribute("class", "selectDialogueMessage");
+        let messageSpan = document.createElement('span');
+        messageSpan.innerHTML = message;
+        htmlNode.appendChild(messageSpan);
+        return htmlNode;            
     }
 
     //TODO:
@@ -562,11 +559,11 @@ second chance available, choose wisely!`
         const dialog = new ConfirmDialog({
             title: "Task turn in confirmation",
             maxWidth: 500,
-            msg: `Are you sure you want to turn in current task in this assignment?
-            This action will automatically close tabs related to this task and run tests on current task. Testing
-            can last a while depending on server load. While this action lasts, you can work on another assignment
-            or wait for notification that task has been turned in successfully and work on a new task. Task description
-            will be opened in new tab.`,
+            msg: `Are you sure y
+            ou want to turn in current task in this assignment? This action will autom
+            atically close tabs related to this task and run tests on current task. Testing ca
+            n last a while depending on server load. While this action lasts, you can work on another assi
+            gnment or wait for notification that task has been turned in successfully and work on a new task. Task description will be opened in new tab.`,
             ok: "Yes",
             cancel: "No"
         });
@@ -580,35 +577,41 @@ second chance available, choose wisely!`
             // Start testing
             this.messageService.info(`Starting unit testing on task '${assignment.currentTask.name}'.`);
             const testStatus = await this.autotestService.runTests(assignmentDirectoryURI, false);
-            console.log("Test status:" ,JSON.stringify(testStatus));
-            console.log("Checkpoint: Started runTests method");
-            //Da li ce ovo praviti problem kod second chancea??
+            if(!testStatus.success) {
+                this.messageService.error("Could not run tests, check if tests are already running and all files are there.");
+                this.setState(state => {
+                    let index = state.studentData.assignmentsData.findIndex( x => x.id == assignment.id );
+                    if(index != -1)
+                        state.studentData.assignmentsData[index].buyingPowerUp = false;
+                });
+            }
             let check = this.state.handlers[assignment.name];
             if(!check) {
                 this.state.handlers[assignment.name] = true;
                 this.autotestService.onTestsFinished( async (e: AutotestEvent) => {
-                    //TODO: dodati user invoked.
-                    console.log("OnTestsFinished fired check:", e.program.isUserInvoked, e.program.uri);
+                    //console.log("OnTestsFinished fired check:", e.program.isUserInvoked, e.program.uri);
                     if(e.program.isUserInvoked || e.program.uri !== assignmentDirectoryURI)
                         return;
-                    console.log("OnTestsFinished fired: ", assignmentDirectoryURI);
+                    //console.log("OnTestsFinished fired: ", assignmentDirectoryURI);
                     let tpResults = await this.autotestService.getTestPassResults(assignmentDirectoryURI);
                     let results = {
                         "passed_tests": tpResults.passed,
                         "total_tests": tpResults.total
                     }
-                    console.log(JSON.stringify(results));
                     //Testing purposes
+                    /*
                     results = {
                         "passed_tests": 9,
                         "total_tests": 10
                     }
+                    */
+                   
+                    let msg = `Testing task '${assignment.currentTask.name}' has been completed.\n\n${results.passed_tests} out of ${results.total_tests} tests passed.\n\nAre you sure you want to turn in this task?`;
+                    let htmlMessageNode = this.createHtmlNode('div', msg);
                     const _dialog = new ConfirmDialog({
                         title: "Task turn in confirmation",
                         maxWidth: 500,
-                        msg: `Testing task '${assignment.currentTask.name}' has
-                        been completed.\n Successful tests: ${results.passed_tests}\n Total tests: ${results.total_tests}\n
-                        Are you sure you want to turn in this task?`,
+                        msg: htmlMessageNode,
                         ok: "Yes",
                         cancel: "No"
                     });
@@ -622,10 +625,10 @@ second chance available, choose wisely!`
                         return;
                     }
                     const response = await this.gameService.turnInTask(assignment, results);
-                    console.log("TURN IN TASK RESPONSE: ", JSON.stringify(response));
                     if(response.success) {
                         this.messageService.info(response.message);
-                        assignment.tasksTurnedIn += 1;
+                        if(assignment.previousPoints == -1)
+                            assignment.tasksTurnedIn += 1;
                         //Update assignment and set state
                         assignment.currentTask = {
                             name: response.data.data.taskData.task_name,
@@ -657,7 +660,7 @@ second chance available, choose wisely!`
                         }
                         if(response.data.data.assignmentDone) {
                             assignment.finished = true;
-                            assignment.tasksTurnedIn = 15;
+                            assignment.tasksTurnedIn = this.getTotalTasks();
                             this.messageService.info(`Congratulations! You have completed all tasks in assignment '${assignment.name}.'`);
                             this.removeAssignmentFiles(assignment);
                         }
@@ -694,13 +697,13 @@ second chance available, choose wisely!`
     private openGameHelpDialog() {
         new GameHelpDialog({title:"UUP GAME INFORMATION & HELP"}).open();
     }
-
+    /*
     private async openGameRules() {
         let uri = new URI(this.workspaceService.workspace?.resource+'/UUP_GAME/Lesson 1/task.html');
         //open(this.openerService, uri, { preview: 'true' } );
         this.miniBrowserOpenHandler.open(uri);
     }
-    
+    */
     protected render(): React.ReactNode {  
         let content;
         if(!this.studentCheck) {
@@ -778,7 +781,7 @@ second chance available, choose wisely!`
             progress = 100;
             xp = 1000;
         }
-        /*  */
+        /*   <span className="game-rules"><a href="#" onClick= { (e) => {e.preventDefault(); this.openGameRules()} }>GAME RULES</a></span> */
         return <div className='student-info'>
             <div className="student-header">
                 <span>{header}</span>
@@ -788,7 +791,7 @@ second chance available, choose wisely!`
                     <i className="fa fa-info-circle" aria-hidden="true"></i>
                 </button>
             </div>
-            <span className="game-rules"><a href="#" onClick= { (e) => {e.preventDefault(); this.openGameRules()} }>GAME RULES</a></span>
+          
             <span className="student-level">Level: {level}</span>
             <div className="progress-bar">
                     <span className="progress-bar-span">{progress.toFixed(2)}%</span>
