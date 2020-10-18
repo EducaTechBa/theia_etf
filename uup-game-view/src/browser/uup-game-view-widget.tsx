@@ -559,11 +559,7 @@ export class UupGameViewWidget extends ReactWidget {
         const dialog = new ConfirmDialog({
             title: "Task turn in confirmation",
             maxWidth: 500,
-            msg: `Are you sure y
-            ou want to turn in current task in this assignment? This action will autom
-            atically close tabs related to this task and run tests on current task. Testing ca
-            n last a while depending on server load. While this action lasts, you can work on another assi
-            gnment or wait for notification that task has been turned in successfully and work on a new task. Task description will be opened in new tab.`,
+            msg: `Are you sure you want to turn in current task in this assignment? This action will automatically close tabs related to this task and run tests on current task. Testing can last a while depending on server load. While this action lasts, you can work on another assignment or wait for notification that task has been turned in successfully and work on a new task. Task description will be opened in new tab.`,
             ok: "Yes",
             cancel: "No"
         });
