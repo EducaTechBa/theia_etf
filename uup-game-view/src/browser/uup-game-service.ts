@@ -19,6 +19,7 @@ export interface UsedPowerup {
 export interface Assignment {
     id: number;
     name: string;
+    path: string;
     active: boolean;
     points: number;
     challenge_pts: number;
@@ -35,6 +36,7 @@ export interface TaskCategory {
 export interface AssignmentDetails {
     id: number;
     name: string;
+    path: string;
     unlocked: boolean; 
     started: boolean;
     finished: boolean;
@@ -373,6 +375,7 @@ export class GameService {
                 let _assignmentDetails : AssignmentDetails = {
                     id: assignment.id,
                     name: assignment.name,
+                    path: assignment.path,
                     unlocked: true,
                     started: true,
                     finished: data.assignmentProgress[index].status == "Completed",
@@ -394,6 +397,7 @@ export class GameService {
                 let _assignmentDetails : AssignmentDetails = {
                     id: assignment.id,
                     name: assignment.name,
+                    path: assignment.path,
                     unlocked: false,
                     started: false,
                     finished: false,

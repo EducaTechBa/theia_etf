@@ -156,13 +156,13 @@ export class UupGameViewWidget extends ReactWidget {
         let fileWatchers : Record<string, boolean> = {};
         assignments.forEach( (x: Assignment) => { 
             fileWatchers[x.name] = true;
-            this.createChangeEventListener(x.name);
+            this.createChangeEventListener(x.path);
         });
         return fileWatchers;
     }
 
-    private createChangeEventListener(name : string) {
-        let uri = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME/${name}`);
+    private createChangeEventListener(path : string) {
+        let uri = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME${path}`);
         //let taskSpecificationURI = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME/${assignment.name}/task.html`);
         //let _taskSpecificationURI = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME/${assignment.name}/task.jpg`);
         //let taskSolutionFileURI = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME/${assignment.name}/main.c`);
@@ -308,9 +308,9 @@ export class UupGameViewWidget extends ReactWidget {
         if(!confirmation)
             return;
 
-        const directoryExists = await this.workspaceService.containsSome([`UUP_GAME/${assignment.name}`]);
+        const directoryExists = await this.workspaceService.containsSome([`UUP_GAME${assignment.path}`]);
         const workspaceURI = this.workspaceService.workspace?.resource || '';
-        const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME/${assignment.name}`;
+        const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME${assignment.path}`;
         //Create directory if it does not exist
         if (!directoryExists) {
             await this.fileService.createFolder(new URI(assignmentDirectoryURI));
@@ -519,9 +519,9 @@ export class UupGameViewWidget extends ReactWidget {
     }
 
     private async generateAssignmentFiles(assignment: AssignmentDetails) {
-        const directoryExists = await this.workspaceService.containsSome([`UUP_GAME/${assignment.name}`]);
+        const directoryExists = await this.workspaceService.containsSome([`UUP_GAME${assignment.path}`]);
         const workspaceURI = this.workspaceService.workspace?.resource || '';
-        const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME/${assignment.name}`;
+        const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME${assignment.path}`;
 
         if (!directoryExists) {
             await this.fileService.createFolder(new URI(assignmentDirectoryURI));
@@ -533,9 +533,9 @@ export class UupGameViewWidget extends ReactWidget {
     }
 
     private async removeAssignmentFiles(assignment: AssignmentDetails) {
-        const directoryExists = await this.workspaceService.containsSome([`UUP_GAME/${assignment.name}`]);
+        const directoryExists = await this.workspaceService.containsSome([`UUP_GAME${assignment.path}`]);
         const workspaceURI = this.workspaceService.workspace?.resource || '';
-        const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME/${assignment.name}`;
+        const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME${assignment.path}`;
 
         if (directoryExists) {
             await this.fileService.delete(new URI(assignmentDirectoryURI), { recursive:true });
@@ -563,7 +563,7 @@ export class UupGameViewWidget extends ReactWidget {
     // zatvoriti i otvoriti fajlove
     private async turnInCurrentTask(assignment: AssignmentDetails) {
         const workspaceURI = this.workspaceService.workspace?.resource || '';
-        const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME/${assignment.name}`;
+        const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME${assignment.path}`;
         //const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME`;
 
         const dialog = new ConfirmDialog({
