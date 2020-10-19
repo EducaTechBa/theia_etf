@@ -4,19 +4,19 @@ import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core';
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
 import { Assignment, PowerupType, StudentData, GameService, ChallengeConfig, AssignmentDetails, TaskCategory, UsedPowerup, /*CourseInfo*/ Task} from './uup-game-service';
-import { ConfirmDialog, open, OpenerService } from '@theia/core/lib/browser';
+import { ConfirmDialog, /*open*/ OpenerService } from '@theia/core/lib/browser';
 import { SelectDialog } from './select-dialogue';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
 import URI from '@theia/core/lib/common/uri';
 import { AutotestService, AutotestEvent } from 'autotest-view/lib/browser/autotest-service';
 import { GameHelpDialog } from './game-help-dialogue';
-import { FileChangeType } from '@theia/filesystem/lib/common/files';
+//import { FileChangeType } from '@theia/filesystem/lib/common/files';
 import { MiniBrowserOpenHandler } from '@theia/mini-browser/lib/browser/mini-browser-open-handler';
 
 
 interface GameInformationState {
     handlers: Record<string, boolean>;
-    fileWatchers: Record<string, boolean>;
+    //fileWatchers: Record<string, boolean>;
     storeOpen: boolean;
     buyingPowerup: boolean;
     assignments: Assignment[];
@@ -55,7 +55,7 @@ export class UupGameViewWidget extends ReactWidget {
 
     private state: GameInformationState = {
         handlers: {},
-        fileWatchers: {},
+       // fileWatchers: {},
         storeOpen: false,
         buyingPowerup: false,
         assignments: [],
@@ -132,12 +132,12 @@ export class UupGameViewWidget extends ReactWidget {
         const _taskCategories = await this.gameService.getTaskCategories();
         const _studentData = await this.gameService.getStudentData(_assignments, _powerupTypes, _challengeConfig?.tasksRequired);
         const _handlers = this.generateEmptyHandlers(_assignments);
-        const _fileWatchers = this.generateWatchers(_assignments);
+        //const _fileWatchers = this.generateWatchers(_assignments);
         return {
             storeOpen: false,
             buyingPowerup: false,
             handlers: _handlers,
-            fileWatchers: _fileWatchers,
+            //fileWatchers: _fileWatchers,
             assignments: _assignments,
             powerupTypes: _powerupTypes,
             challengeConfig: _challengeConfig,
@@ -150,7 +150,7 @@ export class UupGameViewWidget extends ReactWidget {
         update(this.state);
         this.update();
     }
-
+    /*
     private generateWatchers(assignments: Assignment[]) : Record<string, boolean> {
         assignments = assignments.filter( (x) => { return x.active;});
         let fileWatchers : Record<string, boolean> = {};
@@ -182,7 +182,7 @@ export class UupGameViewWidget extends ReactWidget {
                 }
             }
         });
-    }
+    }*/
     /*
     private async getStudentCoursesInfo(): Promise<CourseInfo[]> {
         const url = '/assignment/ws.php?action=courses';
@@ -314,10 +314,10 @@ export class UupGameViewWidget extends ReactWidget {
         //Create directory if it does not exist
         if (!directoryExists) {
             await this.fileService.createFolder(new URI(assignmentDirectoryURI));
-            if(!this.state.fileWatchers[assignment.name]) {
+       /*     if(!this.state.fileWatchers[assignment.name]) {
                 this.state.fileWatchers[assignment.name] = true;
                 this.createChangeEventListener(assignment.path);
-            }
+            }*/
         }  
         //Call service to start asssignment and get a response
         const response = await this.gameService.startAssignment(assignment);
@@ -525,10 +525,10 @@ export class UupGameViewWidget extends ReactWidget {
 
         if (!directoryExists) {
             await this.fileService.createFolder(new URI(assignmentDirectoryURI));
-            if(!this.state.fileWatchers[assignment.name]) {
+         /*   if(!this.state.fileWatchers[assignment.name]) {
                 this.state.fileWatchers[assignment.name] = true;
                 this.createChangeEventListener(assignment.path);
-            }
+            } */
         }
     }
 
@@ -539,7 +539,7 @@ export class UupGameViewWidget extends ReactWidget {
 
         if (directoryExists) {
             await this.fileService.delete(new URI(assignmentDirectoryURI), { recursive:true });
-            this.state.fileWatchers[assignment.name] = false;
+          //  this.state.fileWatchers[assignment.name] = false;
         }
     }
 
