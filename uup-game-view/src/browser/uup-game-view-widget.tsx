@@ -316,7 +316,7 @@ export class UupGameViewWidget extends ReactWidget {
             await this.fileService.createFolder(new URI(assignmentDirectoryURI));
             if(!this.state.fileWatchers[assignment.name]) {
                 this.state.fileWatchers[assignment.name] = true;
-                this.createChangeEventListener(assignment.name);
+                this.createChangeEventListener(assignment.path);
             }
         }  
         //Call service to start asssignment and get a response
@@ -527,7 +527,7 @@ export class UupGameViewWidget extends ReactWidget {
             await this.fileService.createFolder(new URI(assignmentDirectoryURI));
             if(!this.state.fileWatchers[assignment.name]) {
                 this.state.fileWatchers[assignment.name] = true;
-                this.createChangeEventListener(assignment.name);
+                this.createChangeEventListener(assignment.path);
             }
         }
     }
