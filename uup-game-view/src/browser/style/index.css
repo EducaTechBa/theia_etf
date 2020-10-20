@@ -83,7 +83,7 @@
     position: absolute;
     left: 47%;
     padding-top:2px;
-    color: white;
+    color: var(--theia-foreground);
 }
 
 .assignment-locked {
@@ -167,13 +167,13 @@ table.powerups-table td {
 .selectDialogueMessage {
     white-space: pre-wrap;
     text-align: justify !important;
-    color: white;
+    color: var(--theia-foreground);
     margin-bottom:10px;
 }
 
 .selectDialogueDropdown {
     background-color: var(--theia-secondaryButton-background);
-    color: white;
+    color: var(--theia-foreground);
     font-size: 1em;
 }
 
