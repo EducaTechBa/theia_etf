@@ -30,7 +30,9 @@
     "@theia/workspace": "1.6.0",
     "assignments-view": "0.0.0",
     "autotest-view": "0.0.0",
-    "top-bar": "0.0.0"
+    "react-select": "^3.1.0",
+    "top-bar": "0.0.0",
+    "uup-game-view": "0.0.0"
   },
   "devDependencies": {
     "@theia/cli": "latest"
