@@ -184,7 +184,7 @@ export class UupGameViewWidget extends ReactWidget {
                         else if(file.name.match(/.+\.html$/))
                             await this.miniBrowserOpenHandler.open(file.resource);                        
                     }
-                   // await this.autotestViewWidget.refreshWidget(uri);
+                    this.autotestViewWidget.refreshWidget(uri.toString());
                 }
             }
         });
