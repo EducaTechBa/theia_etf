@@ -268,4 +268,12 @@ export class AutotestViewWidget extends ReactWidget {
         await this.setStateFinished(this.state.programDirectoryURI);
     }
 
+    public refreshWidget(dirURI: string) {
+        this.autotestService.removeProgram(dirURI);
+        const initialActiveEditor = this.getInitialActiveEditor();
+        if (initialActiveEditor) {
+            this.handleEditorSwitch(initialActiveEditor)
+        }
+    }
+
 }
