@@ -594,8 +594,10 @@ export class UupGameViewWidget extends ReactWidget {
             let check = this.state.handlers[assignment.name];
             if(!check) {
                 this.state.handlers[assignment.name] = true;
+                
                 this.autotestService.onTestsFinished( async (e: AutotestEvent) => {
-                    //console.log("OnTestsFinished fired check:", e.program.isUserInvoked, e.program.uri);
+                    console.log("OnTestsFinished fired check:", e.program.isUserInvoked, e.program.uri);
+                    console.log("EVENT:", e);
                     if(e.program.isUserInvoked || e.program.uri !== assignmentDirectoryURI)
                         return;
                     //console.log("OnTestsFinished fired: ", assignmentDirectoryURI);
@@ -611,7 +613,6 @@ export class UupGameViewWidget extends ReactWidget {
                         "total_tests": 10
                     }
                     */
-                   
                     let msg = `Testing task '${assignment.currentTask.name}' has been completed.\n\n${results.passed_tests} out of ${results.total_tests} tests passed.\n\nAre you sure you want to turn in this task?`;
                     let htmlMessageNode = this.createHtmlNode('div', msg);
                     const _dialog = new ConfirmDialog({

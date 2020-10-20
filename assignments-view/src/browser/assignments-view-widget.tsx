@@ -72,7 +72,12 @@ export class AssignmentsViewWidget extends TreeWidget {
     protected handleDblClickEvent(node: TreeNode | undefined, event: React.MouseEvent<HTMLElement>): void {
         if (node && AssignmentNode.is(node)) {
             this.assignmentDirectoryGeneration(node.assignment)
-                .catch(err => this.messageService.info('An error occurred while generating assignment sources'));
+                .catch(err => {
+                    console.log("Error occured while generating assignment resources:", err);
+                    console.log("Za svaki slucaj i ovo: ", JSON.stringify(err));
+                    this.messageService.info('An error occurred while generating assignment sources')
+                
+                });
             event.stopPropagation();
         } else {
             this.model.openNode(node);
