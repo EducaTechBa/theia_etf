@@ -1,5 +1,5 @@
 import { injectable, inject } from "inversify";
-import { Emitter } from '@theia/core/lib/common/event';
+import { AsyncEmitter, WaitUntilEvent } from '@theia/core/lib/common/event';
 import { Autotester } from './autotester';
 import { FileStatWithMetadata } from '@theia/filesystem/lib/common/files';
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
@@ -86,7 +86,7 @@ export enum AutotestCancelStatus {
     NO_PROGRAM = 3,
 }
 
-export interface AutotestEvent {
+export interface AutotestEvent extends WaitUntilEvent {
     program: Program,
 }
 
@@ -127,13 +127,13 @@ export class AutotestService {
 
     private state: AutotesterState = { programs: {} };
 
-    private readonly onTestsFinishedEmitter = new Emitter<AutotestEvent>();
+    private readonly onTestsFinishedEmitter = new AsyncEmitter<AutotestEvent>();
     readonly onTestsFinished = this.onTestsFinishedEmitter.event;
 
-    private readonly onTestsUpdateEmitter = new Emitter<AutotestEvent>();
+    private readonly onTestsUpdateEmitter = new AsyncEmitter<AutotestEvent>();
     readonly onTestsUpdate = this.onTestsUpdateEmitter.event;
 
-    private readonly onTestsCanceledEmitter = new Emitter<AutotestEvent>();
+    private readonly onTestsCanceledEmitter = new AsyncEmitter<AutotestEvent>();
     readonly onTestsCanceled = this.onTestsCanceledEmitter.event;
 
     constructor(
@@ -141,7 +141,11 @@ export class AutotestService {
         @inject(FileService) private readonly fileService: FileService,
         @inject(WorkspaceService) private readonly workspaceService: WorkspaceService,
         @inject(SessionManager) private readonly sessionManager: SessionManager,
-    ) { }
+    ) {
+        this.onTestsCanceled.maxListeners = 0;
+        this.onTestsFinished.maxListeners = 0;
+        this.onTestsUpdate.maxListeners = 0;
+    }
 
     public async runTests(dirURI: string, isUserInvoked: boolean): Promise<AutotestRunInfo> {
         if (this.isBeingTested(dirURI)) {
@@ -299,7 +303,7 @@ export class AutotestService {
         return AutotestCancelStatus.CANCELED;
     }
 
-    private removeProgram(dirURI: string) {
+    public removeProgram(dirURI: string) {
         this.state.programs[dirURI] = undefined;
     }
 
