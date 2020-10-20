@@ -1,5 +1,5 @@
 import { injectable, inject } from "inversify";
-import { AsyncEmitter, WaitUntilEvent } from '@theia/core/lib/common/event';
+import { Emitter } from '@theia/core/lib/common/event';
 import { Autotester } from './autotester';
 import { FileStatWithMetadata } from '@theia/filesystem/lib/common/files';
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
@@ -86,7 +86,7 @@ export enum AutotestCancelStatus {
     NO_PROGRAM = 3,
 }
 
-export interface AutotestEvent extends WaitUntilEvent {
+export interface AutotestEvent {
     program: Program,
 }
 
@@ -127,13 +127,13 @@ export class AutotestService {
 
     private state: AutotesterState = { programs: {} };
 
-    private readonly onTestsFinishedEmitter = new AsyncEmitter<AutotestEvent>();
+    private readonly onTestsFinishedEmitter = new Emitter<AutotestEvent>();
     readonly onTestsFinished = this.onTestsFinishedEmitter.event;
 
-    private readonly onTestsUpdateEmitter = new AsyncEmitter<AutotestEvent>();
+    private readonly onTestsUpdateEmitter = new Emitter<AutotestEvent>();
     readonly onTestsUpdate = this.onTestsUpdateEmitter.event;
 
-    private readonly onTestsCanceledEmitter = new AsyncEmitter<AutotestEvent>();
+    private readonly onTestsCanceledEmitter = new Emitter<AutotestEvent>();
     readonly onTestsCanceled = this.onTestsCanceledEmitter.event;
 
     constructor(

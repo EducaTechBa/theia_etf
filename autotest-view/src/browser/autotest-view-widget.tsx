@@ -270,6 +270,7 @@ export class AutotestViewWidget extends ReactWidget {
 
     public refreshWidget(dirURI: string) {
         this.autotestService.removeProgram(dirURI);
+        console.log("Removing program and refreshing widget state [Autotest View]");
         const initialActiveEditor = this.getInitialActiveEditor();
         if (initialActiveEditor) {
             this.handleEditorSwitch(initialActiveEditor)
