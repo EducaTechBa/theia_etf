@@ -273,7 +273,6 @@ export class UupGameViewWidget extends ReactWidget {
         });
         const confirmation = await dialog.open();
         if(confirmation) {
-            this.messageService.info(`Buying power-up '${powerupType.name}' for ${powerupType.price} tokens.`);
             this.setState(state => {
                 state.buyingPowerup = true;
             });
@@ -355,7 +354,6 @@ export class UupGameViewWidget extends ReactWidget {
         });
         const confirmation = await dialog.open();
         if(confirmation) {
-            this.messageService.info(`Using power-up hint for current task.`);
             this.setState(state => {
                 let index = state.studentData.assignmentsData.findIndex( x => x.id == assignment.id );
                 if(index != -1)
@@ -363,7 +361,6 @@ export class UupGameViewWidget extends ReactWidget {
             });
             const response = await this.gameService.useHint(assignment);
             if(response.success) {
-                this.messageService.info(`Power-up 'Hint' has been used successfully.`);
                 this.messageService.info(`Hint: ${response.data.hint}`);
                 let hint = response.data.hint;
                 const index = this.state.studentData?.unusedPowerups.findIndex( (x: any) => { return x.name == 'Hint'; });
@@ -424,7 +421,6 @@ export class UupGameViewWidget extends ReactWidget {
         }).open();
         if(!result) 
             return;    
-        this.messageService.info(`Using power-up second chance. Returning to task ${result.name}.`);
         this.setState(state => {
             let index = state.studentData.assignmentsData.findIndex( x => x.id == assignment.id );
             if(index != -1)
@@ -439,7 +435,6 @@ export class UupGameViewWidget extends ReactWidget {
         }
         const response = await this.gameService.useSecondChance(assignment, result);
         if(response.success) {
-            this.messageService.info(`Power-up 'Second Chance' has been used sucessfully.`);
             this.messageService.info(`You are now back to task ${response.data.data.task_name} [Task ${response.data.data.task_number}].`);
             const index = this.state.studentData?.unusedPowerups.findIndex( (x: any) => { return x.name == 'Second Chance'; });
             this.state.studentData.unusedPowerups[index].amount -= 1;
@@ -492,7 +487,6 @@ export class UupGameViewWidget extends ReactWidget {
         });
         const confirmation = await dialog.open();
         if(confirmation) {
-            this.messageService.info(`Using power-up 'Switch Task' for current task.`);
             this.setState(state => {
                 let index = state.studentData.assignmentsData.findIndex( x => x.id == assignment.id );
                 if(index != -1)
@@ -667,6 +661,7 @@ export class UupGameViewWidget extends ReactWidget {
                         let _additionalTokens = response.data.data.additionalTokens;
                         this.messageService.info(`You earned ${Math.floor(response.data.data.points*1000)} XP and ${response.data.data.tokens} tokens.`);
                         if(Object.keys(_additionalTokens).length !== 0 && _additionalTokens.constructor === Object) {
+                            
                             this.messageService.info(`Congratulations! You earned additional ${_additionalTokens.amount} tokens.
                             Reason: ${_additionalTokens.reason}`)
                             this.state.studentData.tokens += _additionalTokens.amount;
