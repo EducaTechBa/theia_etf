@@ -3,6 +3,7 @@ import { injectable, postConstruct, inject } from 'inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core';
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
+import { EditorManager } from '@theia/editor/lib/browser';
 import { Assignment, PowerupType, StudentData, GameService, ChallengeConfig, AssignmentDetails, TaskCategory, UsedPowerup, /*CourseInfo,*/ Task} from './uup-game-service';
 import { ConfirmDialog, open, OpenerService } from '@theia/core/lib/browser';
 import { SelectDialog } from './select-dialogue';
@@ -56,6 +57,9 @@ export class UupGameViewWidget extends ReactWidget {
 
     @inject(MiniBrowserOpenHandler)
     protected readonly miniBrowserOpenHandler: MiniBrowserOpenHandler;
+
+    @inject(EditorManager)
+    protected readonly editorManager: EditorManager;
 
     private state: GameInformationState = {
         handlers: {},
@@ -189,6 +193,18 @@ export class UupGameViewWidget extends ReactWidget {
             }
         });
     }
+
+    private async closeAllEditorsInFolder(path: string) {
+        let uri = new URI(this.workspaceService.workspace?.resource+`UUP_GAME${path}`);
+        let resolve = await this.fileService.resolve(uri);
+        if(resolve.children?.length) {
+            for(const file of resolve.children) {
+                let fileEditorWidget = await this.editorManager.getByUri(file.resource);
+                fileEditorWidget?.close();
+            }
+        }
+    }
+
     /*
     private async getStudentCoursesInfo(): Promise<CourseInfo[]> {
         const url = '/assignment/ws.php?action=courses';
@@ -631,6 +647,7 @@ export class UupGameViewWidget extends ReactWidget {
                         });
                         return;
                     }
+                    await this.closeAllEditorsInFolder(assignment.path);
                     const response = await this.gameService.turnInTask(assignment, results);
                     if(response.success) {
                         this.messageService.info(response.message);
