@@ -126,7 +126,15 @@ export class AutotestViewWidget extends ReactWidget {
 
         const uri = editorWidget.getResourceUri()?.parent.toString();
 
-        if (uri === undefined || this.state.programDirectoryURI === uri) {
+        if(this.state.programDirectoryURI === uri) {
+            return;
+        }
+
+        await this.updateView(uri);
+    }
+
+    private async updateView(uri: string | undefined) {
+        if (uri === undefined) {
             return;
         }
 
@@ -271,10 +279,7 @@ export class AutotestViewWidget extends ReactWidget {
     public refreshWidget(dirURI: string) {
         this.autotestService.removeProgram(dirURI);
         console.log("Removing program and refreshing widget state [Autotest View]");
-        const initialActiveEditor = this.getInitialActiveEditor();
-        if (initialActiveEditor) {
-            this.handleEditorSwitch(initialActiveEditor)
-        }
+        this.updateView(dirURI);
     }
 
 }
