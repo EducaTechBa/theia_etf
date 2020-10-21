@@ -661,9 +661,9 @@ export class UupGameViewWidget extends ReactWidget {
                         let _additionalTokens = response.data.data.additionalTokens;
                         this.messageService.info(`You earned ${Math.floor(response.data.data.points*1000)} XP and ${response.data.data.tokens} tokens.`);
                         if(Object.keys(_additionalTokens).length !== 0 && _additionalTokens.constructor === Object) {
-                            
-                            this.messageService.info(`Congratulations! You earned additional ${_additionalTokens.amount} tokens.
-                            Reason: ${_additionalTokens.reason}`)
+                            if(!!_additionalTokens.amount && _additionalTokens.amount != 0) 
+                                this.messageService.info(`Congratulations! You earned additional ${_additionalTokens.amount} tokens.
+                                Reason: ${_additionalTokens.reason}`)
                             this.state.studentData.tokens += _additionalTokens.amount;
                         }
                         if(response.data.data.assignmentDone) {
