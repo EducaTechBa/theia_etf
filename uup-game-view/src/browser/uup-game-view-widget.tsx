@@ -195,7 +195,7 @@ export class UupGameViewWidget extends ReactWidget {
     }
 
     private async closeAllEditorsInFolder(path: string) {
-        let uri = new URI(this.workspaceService.workspace?.resource+`UUP_GAME${path}`);
+        let uri = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME${path}`);
         let resolve = await this.fileService.resolve(uri);
         if(resolve.children?.length) {
             for(const file of resolve.children) {
