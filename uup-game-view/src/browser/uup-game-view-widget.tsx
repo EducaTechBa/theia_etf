@@ -649,12 +649,12 @@ export class UupGameViewWidget extends ReactWidget {
                         };
                         if(results.passed_tests === results.total_tests) {
                             assignment.tasksFullyFinished += 1;
-                            if(this.state.challengeConfig.tasksRequired-assignment.tasksFullyFinished > 0) 
-                                this.messageService.warn(`You need to complete ${this.state.challengeConfig.tasksRequired-assignment.tasksFullyFinished}
-                                    more task${this.state.challengeConfig.tasksRequired-assignment.tasksFullyFinished==1?'':'s'}
-                                    with all tests succeeded to unlock next assignment.Do not get locked out!`);
-                            else this.unlockNextAssignment(assignment);
                         }
+                        if(this.state.challengeConfig.tasksRequired-assignment.tasksFullyFinished > 0) 
+                            this.messageService.warn(`You need to complete ${this.state.challengeConfig.tasksRequired-assignment.tasksFullyFinished}
+                                more task${this.state.challengeConfig.tasksRequired-assignment.tasksFullyFinished==1?'':'s'}
+                                with all tests succeeded to unlock next assignment. Do not get locked out!`);
+                        else this.unlockNextAssignment(assignment);
                         if(assignment.previousPoints != -1) {
                             this.state.studentData.points -= assignment.previousPoints;
                             assignment.points -= assignment.previousPoints;
@@ -893,7 +893,7 @@ export class UupGameViewWidget extends ReactWidget {
                         {this.renderAlertBox('warning', 'fa fa-exclamation-circle', 'Warning',
                         `You need to complete ${this.state.challengeConfig.tasksRequired-assignment.tasksFullyFinished}
                         more task${this.state.challengeConfig.tasksRequired-assignment.tasksFullyFinished==1?'':'s'}
-                        with all tests succeeded to unlock next assignment.Do not get locked out!`)}
+                        with all tests succeeded to unlock next assignment. Do not get locked out!`)}
                     </div>
                     <div className={`collapse ${ assignment.taskHint != "" ? ' in' : ''}`}>
                         {this.renderAlertBox('info', 'fa fa-info-circle', 'Hint for current task', assignment.taskHint)}
