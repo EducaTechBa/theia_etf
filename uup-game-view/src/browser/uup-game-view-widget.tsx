@@ -597,15 +597,26 @@ export class UupGameViewWidget extends ReactWidget {
                     state.studentData.assignmentsData[index].buyingPowerUp = true;
             });
             // Start testing
-            this.messageService.info(`Starting unit testing on task '${assignment.currentTask.name}'.`);
-            const testStatus = await this.autotestService.runTests(assignmentDirectoryURI, false);
-            if(!testStatus.success) {
-                this.messageService.error("Could not run tests, check if tests are already running and all files are there.");
+            try {
+                this.messageService.info(`Starting unit testing on task '${assignment.currentTask.name}'.`);
+                const testStatus = await this.autotestService.runTests(assignmentDirectoryURI, false);
+                if(!testStatus.success) {
+                    this.messageService.error("Could not run tests, check if tests are already running and all files are there.");
+                    this.setState(state => {
+                        let index = state.studentData.assignmentsData.findIndex( x => x.id == assignment.id );
+                        if(index != -1)
+                            state.studentData.assignmentsData[index].buyingPowerUp = false;
+                    });
+                }
+            } catch(err) {
+                console.log(`This occurred when running autotest from UUPGameViewWidget: ${err}`);
+                this.messageService.error("An error occured when attempting to run tests!");
                 this.setState(state => {
                     let index = state.studentData.assignmentsData.findIndex( x => x.id == assignment.id );
                     if(index != -1)
                         state.studentData.assignmentsData[index].buyingPowerUp = false;
                 });
+                return;
             }
             let check = this.state.handlers[assignment.name];
             if(!check) {
