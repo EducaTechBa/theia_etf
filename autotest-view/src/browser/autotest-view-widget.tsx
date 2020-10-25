@@ -63,7 +63,8 @@ export class AutotestViewWidget extends ReactWidget {
         });
 
         this.editorManager.onCreated(editorWidget => this.handleEditorSwitch(editorWidget));
-        this.editorManager.onActiveEditorChanged(editorWidget => this.handleEditorSwitch(editorWidget));
+        // TODO: Check if onCurrentEditorChanged handles the view update correctly when a file is opened
+        this.editorManager.onCurrentEditorChanged(editorWidget => this.handleEditorSwitch(editorWidget));
 
         const initialActiveEditor = this.getInitialActiveEditor();
         if (initialActiveEditor) {
@@ -126,7 +127,7 @@ export class AutotestViewWidget extends ReactWidget {
 
         const uri = editorWidget.getResourceUri()?.parent.toString();
 
-        if(this.state.programDirectoryURI === uri) {
+        if (this.state.programDirectoryURI === uri) {
             return;
         }
 
@@ -171,6 +172,14 @@ export class AutotestViewWidget extends ReactWidget {
     }
 
     protected render(): React.ReactNode {
+        if (this.state.programDirectoryURI === undefined) {
+            return <div id='autotests-container'>
+                <span>
+                    Please open a source file to show autotest status if available.
+                </span>
+            </div>
+        }
+
         return <div id='autotests-container'>
             <button
                 className="theia-button run-tests-button"
@@ -243,13 +252,18 @@ export class AutotestViewWidget extends ReactWidget {
                     message = "No autotests defined.";
                 } else if (runInfo.status === AutotestRunStatus.RUNNING) {
                     message = "Allready running tests...";
+                } else if (runInfo.status === AutotestRunStatus.AUTOTEST_FILE_CORRUPT) {
+                    message = "Autotests are corrupt. Please contact your supervisor!";
                 }
+
                 this.setState(state => {
                     state.statusMessage = message;
                     state.isRunningTests = false;
                 });
             }
         } catch (err) {
+            console.log(`An error occured when running tests: ${err}`);
+
             this.setState(state => {
                 state.isRunningTests = false;
                 state.statusMessage = err;

@@ -78,6 +78,8 @@ export enum AutotestRunStatus {
     RUNNING = 1,
     NO_AUTOTESTS_DEFINED = 2,
     ERROR_OPENING_DIRECTORY = 3,
+    AUTOTEST_FILE_CORRUPT = 4,
+    ERROR_REACHING_SERVER = 5,
 }
 
 export enum AutotestCancelStatus {
@@ -163,9 +165,28 @@ export class AutotestService {
             };
         }
 
-        const autotest = JSON.parse(autotestContent);
-        const taskID = await this.autotester.setTask(autotest);
-        console.log(`Task ID: ${taskID}`);
+        let autotest;
+        
+        try {
+            autotest = JSON.parse(autotestContent);
+        } catch(err) {
+            console.log(`Corrupt '${this.AUTOTEST_FILENAME}' file in ${dirURI}`);
+            return {
+                success: false,
+                status: AutotestRunStatus.AUTOTEST_FILE_CORRUPT
+            };
+        }
+        
+        let taskID;
+        try {
+            taskID = await this.autotester.setTask(autotest);
+            console.log(`Task ID: ${taskID}`);
+        } catch(err) {
+            return {
+                success: false,
+                status: AutotestRunStatus.ERROR_REACHING_SERVER
+            };
+        }
 
         let program = this.getProgram(dirURI);
         if (!program) {
@@ -190,6 +211,7 @@ export class AutotestService {
         const filesStats = dir.children ?? [];
         const assignmentFiles = filesStats.map(file => ({
             uri: file.resource,
+            // TODO: Replace displayName with use of LabelProvider
             name: new URI(file.resource.toString()).displayName
         }));
 
@@ -453,7 +475,8 @@ export class AutotestService {
         const form = document.createElement("form");
         form.setAttribute("id", "renderer_form");
         form.setAttribute("method", "post");
-        form.setAttribute("action", "/autotester/render/render.php");
+        // TODO: Check if language is set properly
+        form.setAttribute("action", "/autotester/render/render.php?language=bs");
         form.setAttribute("target", "view");
 
         const hiddenField = document.createElement("input");
