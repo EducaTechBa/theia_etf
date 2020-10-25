@@ -213,7 +213,9 @@ export class AutotestViewWidget extends ReactWidget {
             await this.handleCancelTests();
         } else {
             console.log("Running tests...");
-            await this.handleRunTests();
+            if(this.state.programDirectoryURI) {
+                await this.runTests(this.state.programDirectoryURI);
+            }
         }
     }
 
@@ -225,12 +227,8 @@ export class AutotestViewWidget extends ReactWidget {
         await this.autotestService.openResultsPage(this.state.programDirectoryURI, taskID);
     }
 
-    private async handleRunTests() {
-        if (!this.state.programDirectoryURI) {
-            return;
-        }
-
-        if (this.autotestService.isBeingTested(this.state.programDirectoryURI)) {
+    public async runTests(dirURI: string) {
+        if (this.autotestService.isBeingTested(dirURI)) {
             this.messageService.info("Allready running tests. Please wait...");
             return;
         }
@@ -243,7 +241,7 @@ export class AutotestViewWidget extends ReactWidget {
                 state.progressMessage = '';
             });
 
-            const runInfo = await this.autotestService.runTests(this.state.programDirectoryURI, true);
+            const runInfo = await this.autotestService.runTests(dirURI, true);
             if (!runInfo.success) {
                 let message = "";
                 if (runInfo.status === AutotestRunStatus.ERROR_OPENING_DIRECTORY) {
@@ -271,7 +269,6 @@ export class AutotestViewWidget extends ReactWidget {
                 state.autotestResults = [];
             });
         }
-
     }
 
     private async handleCancelTests() {
