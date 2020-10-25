@@ -15,7 +15,7 @@ export class Autotester {
     }
 
     // Call getTask, not setTask?
-    public async setTask(autotest: any): Promise<string> {
+    public async setTask(autotest: any): Promise<number> {
         const autotestQuery = encodeURIComponent(JSON.stringify(autotest));
         const url = this.makeURL('setTask', '');
         const res = await fetch(url, {
@@ -32,8 +32,13 @@ export class Autotester {
         return data.data;
     }
 
-    public async setProgram(taskID: string, taskName: string): Promise<string> {
-        const program = { task: taskID, name: taskName };
+    public async setProgram(programID: number | undefined, taskID: number, programName: string): Promise<number> {
+        const program: any = { task: taskID, name: programName };
+
+        if(programID) {
+            program.id = programID;
+        }
+
         const programQuery = encodeURIComponent(JSON.stringify(program));
         const url = this.makeURL('setProgram', '');
 
@@ -49,7 +54,7 @@ export class Autotester {
         return data.data;
     }
 
-    public async setProgramFiles(programID: string, files: AssignmentFile[]) {
+    public async setProgramFiles(programID: number, files: AssignmentFile[]) {
         const url = this.makeURL('setProgramFile', `id=${programID}`);
 
         const zip = new JSZip();
@@ -66,7 +71,7 @@ export class Autotester {
         });
     }
 
-    public async getResults(programID: string) {
+    public async getResults(programID: number) {
         const url = this.makeURL('getResult', `id=${programID}`);
         const res = await fetch(url);
         const data = await res.json();

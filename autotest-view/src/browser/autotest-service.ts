@@ -19,9 +19,10 @@ namespace AutotesterState {
 }
 
 export interface Program {
-    id: string;
+    id: number;
     uri: string;
     status: ProgramStatus;
+    taskID: number | undefined;
     totalTests: number;
     isUserInvoked: boolean,
     result?: Result;
@@ -166,22 +167,22 @@ export class AutotestService {
         }
 
         let autotest;
-        
+
         try {
             autotest = JSON.parse(autotestContent);
-        } catch(err) {
+        } catch (err) {
             console.log(`Corrupt '${this.AUTOTEST_FILENAME}' file in ${dirURI}`);
             return {
                 success: false,
                 status: AutotestRunStatus.AUTOTEST_FILE_CORRUPT
             };
         }
-        
+
         let taskID;
         try {
             taskID = await this.autotester.setTask(autotest);
             console.log(`Task ID: ${taskID}`);
-        } catch(err) {
+        } catch (err) {
             return {
                 success: false,
                 status: AutotestRunStatus.ERROR_REACHING_SERVER
@@ -189,12 +190,19 @@ export class AutotestService {
         }
 
         let program = this.getProgram(dirURI);
-        if (!program) {
-            const taskName = await this.resolveTaskName(dirURI);
-            const nonSilentAutotests = autotest.tests.filter((test: any) => !(test.options && test.options.includes('silent')));
-            program = await this.createProgram(taskID, taskName, nonSilentAutotests.length, dirURI, isUserInvoked);
-            this.state.programs[dirURI] = program;
+
+        const programName = await this.resolveProgramName(dirURI);
+        const nonSilentAutotests = autotest.tests.filter((test: any) => !(test.options && test.options.includes('silent')));
+
+        if (program) {
+            if(taskID !== program.taskID) {
+                program = await this.createProgram(program.id, taskID, programName, nonSilentAutotests.length, dirURI, isUserInvoked);
+            }
+        } else {
+            program = await this.createProgram(undefined, taskID, programName, nonSilentAutotests.length, dirURI, isUserInvoked);
         }
+
+        this.state.programs[dirURI] = program;
         program.isUserInvoked = isUserInvoked;
 
         console.log(`Program ID: ${program.id}`);
@@ -238,20 +246,21 @@ export class AutotestService {
         };
     }
 
-    private async resolveTaskName(dirURI: string): Promise<string> {
+    private async resolveProgramName(dirURI: string): Promise<string> {
         const userInfo = await this.sessionManager.getUserInfo();
         const path = this.getPathInWorkspace(dirURI);
         return `${userInfo.username}/${path}`;
     }
 
-    private async createProgram(taskID: string, taskName: string, totalTests: number, uri: string, isUserInvoked: boolean): Promise<Program> {
-        const id = await this.autotester.setProgram(taskID, taskName);
+    private async createProgram(programID: number | undefined, taskID: number, programName: string, totalTests: number, uri: string, isUserInvoked: boolean): Promise<Program> {
+        const id = await this.autotester.setProgram(programID, taskID, programName);
         return {
             id,
             status: ProgramStatus.PROGRAM_AWAITING_TESTS,
             totalTests,
             uri,
             isUserInvoked,
+            taskID,
         };
     }
 
@@ -405,11 +414,12 @@ export class AutotestService {
         };
 
         const program: Program = {
-            id: '',
+            id: -1,
             totalTests: 0,
             uri: dirURI,
             status: this.integerToProgramStatus(data.status),
             result,
+            taskID: -1,
             isUserInvoked: false,
         };
 
