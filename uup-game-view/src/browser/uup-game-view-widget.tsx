@@ -867,6 +867,9 @@ export class UupGameViewWidget extends ReactWidget {
                 </div>
                 <div className='theia-message-content' >{message}</div>
             </div>
+            <div>
+                <img src="https://autnot.files.wordpress.com/2016/05/img_5533.jpg?w=640&h=1&crop=1" alt="YOU SHALL NOT PASS!" style={{width: "100%"}}></img>
+            </div>
         </div>;
     
     }
