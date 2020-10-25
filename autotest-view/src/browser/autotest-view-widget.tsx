@@ -101,17 +101,21 @@ export class AutotestViewWidget extends ReactWidget {
 
     private async setStateFinished(dirURI: string) {
         const program = await this.autotestService.getProgramFromAutotestResultFile(dirURI);
-
+        console.log("setStateFinished LOGGER: Progam is :", JSON.stringify(program));
         if (program === undefined || program.result === undefined) {
+            console.log("setStateFinished LOGGER: program is undefined check ");
             this.setState(state => {
+                console.log("setStateFinished LOGGER: Setting state to not tested before");
+                console.log("statE: ", JSON.stringify(state));
                 state.autotestResults = [];
                 state.statusMessage = 'This program has not been tested before.';
                 state.progressMessage = '';
                 state.isRunningTests = false;
             });
+            console.log("setStateFinished LOGGER: finished setState Operation");
             return;
         }
-
+        console.log("Do ovog ne bi trebalo doci jel tako??");
         this.setState(state => {
             state.statusMessage = program.status.toString();
             state.progressMessage = '';
@@ -138,15 +142,16 @@ export class AutotestViewWidget extends ReactWidget {
         if (uri === undefined) {
             return;
         }
-
+        console.log("Updating View: Check 1");
         this.setState(state => {
+            console.log("Updating View: Setting URI to: ", uri);
             state.programDirectoryURI = uri;
         });
 
         if (this.state.programDirectoryURI === undefined) {
             return;
         }
-
+        console.log("Updating View: Check 3");
         if (this.autotestService.isBeingTested(this.state.programDirectoryURI)) {
             const program = this.autotestService.getProgram(this.state.programDirectoryURI);
             if (program === undefined || program.result === undefined) {
@@ -156,7 +161,7 @@ export class AutotestViewWidget extends ReactWidget {
             this.setStateProcessing(program);
             return;
         }
-
+        console.log("Updating View: Check 4 - Prosao isBeingTested");
         const hasAutotests = await this.autotestService.hasAutotestsDefined(this.state.programDirectoryURI);
         if (!hasAutotests) {
             this.setState(state => {
@@ -167,7 +172,7 @@ export class AutotestViewWidget extends ReactWidget {
             });
             return;
         }
-
+        console.log("Updating View: Check 5 - Prosao hasAutotests");
         await this.setStateFinished(this.state.programDirectoryURI);
     }
 
