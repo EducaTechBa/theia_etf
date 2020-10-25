@@ -19,9 +19,10 @@ namespace AutotesterState {
 }
 
 export interface Program {
-    id: string;
+    id: number;
     uri: string;
     status: ProgramStatus;
+    taskID: number | undefined;
     totalTests: number;
     isUserInvoked: boolean,
     result?: Result;
@@ -78,6 +79,8 @@ export enum AutotestRunStatus {
     RUNNING = 1,
     NO_AUTOTESTS_DEFINED = 2,
     ERROR_OPENING_DIRECTORY = 3,
+    AUTOTEST_FILE_CORRUPT = 4,
+    ERROR_REACHING_SERVER = 5,
 }
 
 export enum AutotestCancelStatus {
@@ -163,17 +166,43 @@ export class AutotestService {
             };
         }
 
-        const autotest = JSON.parse(autotestContent);
-        const taskID = await this.autotester.setTask(autotest);
-        console.log(`Task ID: ${taskID}`);
+        let autotest;
+
+        try {
+            autotest = JSON.parse(autotestContent);
+        } catch (err) {
+            console.log(`Corrupt '${this.AUTOTEST_FILENAME}' file in ${dirURI}`);
+            return {
+                success: false,
+                status: AutotestRunStatus.AUTOTEST_FILE_CORRUPT
+            };
+        }
+
+        let taskID;
+        try {
+            taskID = await this.autotester.setTask(autotest);
+            console.log(`Task ID: ${taskID}`);
+        } catch (err) {
+            return {
+                success: false,
+                status: AutotestRunStatus.ERROR_REACHING_SERVER
+            };
+        }
 
         let program = this.getProgram(dirURI);
-        if (!program) {
-            const taskName = await this.resolveTaskName(dirURI);
-            const nonSilentAutotests = autotest.tests.filter((test: any) => !(test.options && test.options.includes('silent')));
-            program = await this.createProgram(taskID, taskName, nonSilentAutotests.length, dirURI, isUserInvoked);
-            this.state.programs[dirURI] = program;
+
+        const programName = await this.resolveProgramName(dirURI);
+        const nonSilentAutotests = autotest.tests.filter((test: any) => !(test.options && test.options.includes('silent')));
+
+        if (program) {
+            if(taskID !== program.taskID) {
+                program = await this.createProgram(program.id, taskID, programName, nonSilentAutotests.length, dirURI, isUserInvoked);
+            }
+        } else {
+            program = await this.createProgram(undefined, taskID, programName, nonSilentAutotests.length, dirURI, isUserInvoked);
         }
+
+        this.state.programs[dirURI] = program;
         program.isUserInvoked = isUserInvoked;
 
         console.log(`Program ID: ${program.id}`);
@@ -190,6 +219,7 @@ export class AutotestService {
         const filesStats = dir.children ?? [];
         const assignmentFiles = filesStats.map(file => ({
             uri: file.resource,
+            // TODO: Replace displayName with use of LabelProvider
             name: new URI(file.resource.toString()).displayName
         }));
 
@@ -216,20 +246,21 @@ export class AutotestService {
         };
     }
 
-    private async resolveTaskName(dirURI: string): Promise<string> {
+    private async resolveProgramName(dirURI: string): Promise<string> {
         const userInfo = await this.sessionManager.getUserInfo();
         const path = this.getPathInWorkspace(dirURI);
         return `${userInfo.username}/${path}`;
     }
 
-    private async createProgram(taskID: string, taskName: string, totalTests: number, uri: string, isUserInvoked: boolean): Promise<Program> {
-        const id = await this.autotester.setProgram(taskID, taskName);
+    private async createProgram(programID: number | undefined, taskID: number, programName: string, totalTests: number, uri: string, isUserInvoked: boolean): Promise<Program> {
+        const id = await this.autotester.setProgram(programID, taskID, programName);
         return {
             id,
             status: ProgramStatus.PROGRAM_AWAITING_TESTS,
             totalTests,
             uri,
             isUserInvoked,
+            taskID,
         };
     }
 
@@ -383,11 +414,12 @@ export class AutotestService {
         };
 
         const program: Program = {
-            id: '',
+            id: -1,
             totalTests: 0,
             uri: dirURI,
             status: this.integerToProgramStatus(data.status),
             result,
+            taskID: -1,
             isUserInvoked: false,
         };
 
@@ -453,7 +485,8 @@ export class AutotestService {
         const form = document.createElement("form");
         form.setAttribute("id", "renderer_form");
         form.setAttribute("method", "post");
-        form.setAttribute("action", "/autotester/render/render.php");
+        // TODO: Check if language is set properly
+        form.setAttribute("action", "/autotester/render/render.php?language=bs");
         form.setAttribute("target", "view");
 
         const hiddenField = document.createElement("input");
