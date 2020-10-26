@@ -56,14 +56,20 @@ export class AutotestViewWidget extends ReactWidget {
 
         this.autotestService.onTestsFinished(autotestEvent => {
             const program = autotestEvent.program;
-            if (program.uri !== this.state.programDirectoryURI) {
-                return;
+            if (program.uri === this.state.programDirectoryURI) {
+                this.setStateFinished(this.state.programDirectoryURI);
             }
-            this.setStateFinished(this.state.programDirectoryURI);
+        });
+
+        this.autotestService.onProgramRemoved(autotestEvent => {
+            const uri = autotestEvent.program.uri;
+            if (uri === this.state.programDirectoryURI) {
+                console.log(`Updating view on removed program ${uri}...`);
+                this.updateView(uri);
+            }
         });
 
         this.editorManager.onCreated(editorWidget => this.handleEditorSwitch(editorWidget));
-        // TODO: Check if onCurrentEditorChanged handles the view update correctly when a file is opened
         this.editorManager.onCurrentEditorChanged(editorWidget => this.handleEditorSwitch(editorWidget));
 
         const initialActiveEditor = this.getInitialActiveEditor();
@@ -279,12 +285,6 @@ export class AutotestViewWidget extends ReactWidget {
         }
 
         await this.setStateFinished(this.state.programDirectoryURI);
-    }
-
-    public refreshWidget(dirURI: string) {
-        this.autotestService.removeProgram(dirURI);
-        console.log("Removing program and refreshing widget state [Autotest View]");
-        this.updateView(dirURI);
     }
 
 }

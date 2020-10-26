@@ -139,6 +139,9 @@ export class AutotestService {
     private readonly onTestsCanceledEmitter = new Emitter<AutotestEvent>();
     readonly onTestsCanceled = this.onTestsCanceledEmitter.event;
 
+    private readonly onProgramRemovedEmitter = new Emitter<AutotestEvent>();
+    readonly onProgramRemoved = this.onProgramRemovedEmitter.event;
+
     constructor(
         @inject(Autotester) private readonly autotester: Autotester,
         @inject(FileService) private readonly fileService: FileService,
@@ -335,7 +338,11 @@ export class AutotestService {
     }
 
     public removeProgram(dirURI: string) {
-        this.state.programs[dirURI] = undefined;
+        const program = this.state.programs[dirURI];
+        if(program) {
+            this.onProgramRemovedEmitter.fire({ program });
+            this.state.programs[dirURI] = undefined;
+        }
     }
 
     private integerToProgramStatus(status: number): ProgramStatus {

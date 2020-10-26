@@ -9,8 +9,9 @@ import { ConfirmDialog, open, OpenerService } from '@theia/core/lib/browser';
 import { SelectDialog } from './select-dialogue';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
 import URI from '@theia/core/lib/common/uri';
+// @ts-ignore
 import { AutotestService, AutotestEvent } from 'autotest-view/lib/browser/autotest-service';
-import { AutotestViewWidget } from 'autotest-view/lib/browser/autotest-view-widget';
+// import { AutotestViewWidget } from 'autotest-view/lib/browser/autotest-view-widget';
 import { GameHelpDialog } from './game-help-dialogue';
 import { FileChangeType } from '@theia/filesystem/lib/common/files';
 import { MiniBrowserOpenHandler } from '@theia/mini-browser/lib/browser/mini-browser-open-handler';
@@ -49,8 +50,8 @@ export class UupGameViewWidget extends ReactWidget {
     @inject(AutotestService)
     protected readonly autotestService: AutotestService;
 
-    @inject(AutotestViewWidget)
-    protected readonly autotestViewWidget: AutotestViewWidget;
+    // @inject(AutotestViewWidget)
+    // protected readonly autotestViewWidget: AutotestViewWidget;
 
     @inject(OpenerService)
     protected readonly openerService: OpenerService;
@@ -188,7 +189,8 @@ export class UupGameViewWidget extends ReactWidget {
                         else if(file.name.match(/.+\.html$/))
                             await this.miniBrowserOpenHandler.open(file.resource);                        
                     }
-                    this.autotestViewWidget.refreshWidget(uri.toString());
+                    // this.autotestViewWidget.refreshWidget(uri.toString());
+                    this.autotestService.removeProgram(uri.toString());
                 }
             }
         });
