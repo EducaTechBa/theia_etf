@@ -814,8 +814,8 @@ export class UupGameViewWidget extends ReactWidget {
         let level = Math.floor(points) + 1;
         let progress : number = (points - Math.floor(points))*100;
         let xp = Math.floor(progress * 10);
-        if(Math.abs(points - 30) < 0.0001 ) {
-            level = 30;
+        if(points >= 40 ) {
+            level = 40;
             progress = 100;
             xp = 1000;
         }
