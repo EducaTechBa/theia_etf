@@ -4,7 +4,7 @@ import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core';
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
 import { EditorManager } from '@theia/editor/lib/browser';
-import { Assignment, PowerupType, StudentData, GameService, ChallengeConfig, AssignmentDetails, TaskCategory, UsedPowerup, /*CourseInfo,*/ Task} from './uup-game-service';
+import { Assignment, PowerupType, StudentData, GameService, ChallengeConfig, AssignmentDetails, TaskCategory, UsedPowerup, CourseInfo, Task} from './uup-game-service';
 import { ConfirmDialog, open, OpenerService } from '@theia/core/lib/browser';
 import { SelectDialog } from './select-dialogue';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
@@ -95,7 +95,7 @@ export class UupGameViewWidget extends ReactWidget {
         this.title.caption = UupGameViewWidget.LABEL;
         this.title.closable = true;
         this.title.iconClass = 'fa fa-gamepad'; // Gamepad Icon
-        /*
+        
         const courses = await this.getStudentCoursesInfo();
         for(const course of courses) {
             if(course.abbrev==='UUP' || course.abbrev==='OR') {
@@ -103,8 +103,7 @@ export class UupGameViewWidget extends ReactWidget {
                 break;
             }
         }
-        */
-        this.studentCheck = await this.getAccessInfo();
+        
         try {
             if(this.studentCheck) {
                 this.messageService.info("Started initializing game information state");
@@ -207,7 +206,7 @@ export class UupGameViewWidget extends ReactWidget {
         }
     }
 
-    /*
+    
     private async getStudentCoursesInfo(): Promise<CourseInfo[]> {
         const url = '/assignment/ws.php?action=courses';
         const res = await fetch(url, {
@@ -225,7 +224,7 @@ export class UupGameViewWidget extends ReactWidget {
             external: course.external,
         }));
     }
-    */
+    /*
     private async getAccessInfo(): Promise<boolean> {
         const url = '/services/uup_game.php?action=check';
         const res = await fetch(url, {
@@ -235,7 +234,7 @@ export class UupGameViewWidget extends ReactWidget {
         const json = await res.json();
         return json.success;
     }
-
+    */
     private generateEmptyHandlers(assignments: Assignment[]) : Record<string, boolean> {
         assignments = assignments.filter( (x) => { return x.active;});
         let handlers : Record<string,boolean> = {};
@@ -814,8 +813,8 @@ export class UupGameViewWidget extends ReactWidget {
         let level = Math.floor(points) + 1;
         let progress : number = (points - Math.floor(points))*100;
         let xp = Math.floor(progress * 10);
-        if(Math.abs(points - 30) < 0.0001 ) {
-            level = 30;
+        if(points >= 40 ) {
+            level = 40;
             progress = 100;
             xp = 1000;
         }
