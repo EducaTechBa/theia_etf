@@ -1,8 +1,14 @@
 import { injectable } from 'inversify';
 import * as JSZip from 'jszip';
 
-export interface AssignmentFile {
+export interface AssignmentDirectory {
     uri: string;
+    subdirectories: AssignmentDirectory[];
+    files: AssignmentFile[];
+}
+
+export interface AssignmentFile {
+    path: string;
     name: string;
     content: string;
 };
@@ -54,11 +60,13 @@ export class Autotester {
         return data.data;
     }
 
-    public async setProgramFiles(programID: number, files: AssignmentFile[]) {
+    public async setProgramFiles(programID: number, directory: AssignmentDirectory) {
         const url = this.makeURL('setProgramFile', `id=${programID}`);
 
         const zip = new JSZip();
-        files.forEach(file => zip.file(file.name, file.content));
+
+        await this.traverse(directory, file => zip.file(file.path, file.content));
+
         const content = await zip.generateAsync({ type: 'blob' });
 
         const formData = new FormData();
@@ -67,6 +75,13 @@ export class Autotester {
             method: 'POST',
             body: formData
         });
+    }
+
+    private async traverse(directory: AssignmentDirectory, func: (dir: AssignmentFile) => void): Promise<void> {
+        const subdirectoriesTraverse = directory.subdirectories.map(dir => this.traverse(dir, func));
+        await Promise.all(subdirectoriesTraverse);
+        
+        directory.files.forEach(file => func(file));
     }
 
     public async getResults(programID: number) {

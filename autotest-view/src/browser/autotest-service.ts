@@ -1,6 +1,6 @@
 import { injectable, inject } from "inversify";
 import { Emitter } from '@theia/core/lib/common/event';
-import { Autotester } from './autotester';
+import { AssignmentDirectory, AssignmentFile, Autotester } from './autotester';
 import { FileStatWithMetadata } from '@theia/filesystem/lib/common/files';
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
@@ -198,7 +198,7 @@ export class AutotestService {
         const nonSilentAutotests = autotest.tests.filter((test: any) => !(test.options && test.options.includes('silent')));
 
         if (program) {
-            if(taskID !== program.taskID) {
+            if (taskID !== program.taskID) {
                 program = await this.createProgram(program.id, taskID, programName, nonSilentAutotests.length, dirURI, isUserInvoked);
             }
         } else {
@@ -210,43 +210,65 @@ export class AutotestService {
 
         console.log(`Program ID: ${program.id}`);
 
-        const dir = await this.fileService.resolve(new URI(dirURI));
-
-        if (!dir || !dir.isDirectory) {
+        try {
+            const dir = await this.loadAssignmentDirectory(dirURI);
+            // console.log(`Directories are: ${JSON.stringify(dir)}`);
+            await this.autotester.setProgramFiles(program.id, dir);
+            console.log("Source files are set...");
+        } catch (err) {
+            console.log(err);
             return {
                 success: false,
                 status: AutotestRunStatus.ERROR_OPENING_DIRECTORY
             };
         }
 
-        const filesStats = dir.children ?? [];
-        // TODO: Check if you should zip folders as well?
-        const assignmentFiles = filesStats
-            .filter(file => file.isFile && file.name[0] !== '.')
-            .map(file => ({
-                uri: file.resource,
-                name: file.name
-            }));
-
-        const promises = assignmentFiles.map(file =>
-            this.fileService
-                .read(file.uri)
-                .then(({ value }) => ({
-                    ...file,
-                    uri: file.uri.toString(),
-                    content: value
-                }))
-        );
-
-        const files = await Promise.all(promises);
-        await this.autotester.setProgramFiles(program.id, files);
-        console.log("Source files are set...");
-
         this.getResults(dirURI);
 
         return {
             success: true,
             status: AutotestRunStatus.RUNNING
+        };
+    }
+
+    private async loadAssignmentDirectory(dirURI: string, baseURI: string = dirURI): Promise<AssignmentDirectory> {
+        const dir = await this.fileService.resolve(new URI(dirURI));
+
+        if (!dir || !dir.isDirectory) {
+            throw Error(`Could not resolve ${dirURI}`);
+        }
+
+        const filesStats = dir.children ?? [];
+
+        const assignmentFiles = filesStats
+            .filter(file => file.isFile && file.name[0] !== '.')
+            .map(file => ({
+                uri: file.resource,
+                name: file.name,
+                path: this.getRelativePath(file.resource.toString(), baseURI)
+            }));
+
+        const assignmentFilesPromises = assignmentFiles.map(async file => {
+            const { value } = await this.fileService.read(file.uri);
+            return {
+                ...file,
+                content: value
+            };
+        });
+
+        const assignmentDirs = filesStats
+            .filter(file => file.isDirectory);
+
+        const assignmentDirsPromises = assignmentDirs
+            .map(file => this.loadAssignmentDirectory(file.resource.toString(), baseURI));
+
+        const files: AssignmentFile[] = await Promise.all(assignmentFilesPromises);
+        const subdirectories: AssignmentDirectory[] = await Promise.all(assignmentDirsPromises);
+
+        return {
+            uri: dirURI,
+            subdirectories,
+            files,
         };
     }
 
@@ -340,7 +362,7 @@ export class AutotestService {
 
     public removeProgram(dirURI: string) {
         const program = this.state.programs[dirURI];
-        if(program) {
+        if (program) {
             this.onProgramRemovedEmitter.fire({ program });
             this.state.programs[dirURI] = undefined;
         }
@@ -381,7 +403,11 @@ export class AutotestService {
 
     private getPathInWorkspace(uri: string): string {
         const workspaceUri = this.workspaceService.workspace?.resource.toString();
-        return uri.slice(workspaceUri?.length);
+        return this.getRelativePath(uri, workspaceUri ?? '');
+    }
+
+    private getRelativePath(uri: string, base: string) {
+        return uri.slice(base.length);
     }
 
     private async loadAutotestResultsFile(dirURI: string): Promise<string | undefined> {
