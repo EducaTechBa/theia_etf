@@ -220,12 +220,13 @@ export class AutotestService {
         }
 
         const filesStats = dir.children ?? [];
-        const assignmentFiles = filesStats.map(file => ({
-            uri: file.resource,
-            // TODO: Replace displayName with use of LabelProvider
-            name: new URI(file.resource.toString()).displayName
-        }));
-
+        // TODO: Check if you should zip folders as well?
+        const assignmentFiles = filesStats
+            .filter(file => file.isFile && file.name[0] !== '.')
+            .map(file => ({
+                uri: file.resource,
+                name: file.name
+            }));
 
         const promises = assignmentFiles.map(file =>
             this.fileService

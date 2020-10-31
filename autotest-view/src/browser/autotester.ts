@@ -58,9 +58,7 @@ export class Autotester {
         const url = this.makeURL('setProgramFile', `id=${programID}`);
 
         const zip = new JSZip();
-        const nonHiddenFiles = files.filter(file => file.name[0] !== '.');
-        nonHiddenFiles
-            .forEach(file => zip.file(file.name, file.content));
+        files.forEach(file => zip.file(file.name, file.content));
         const content = await zip.generateAsync({ type: 'blob' });
 
         const formData = new FormData();
