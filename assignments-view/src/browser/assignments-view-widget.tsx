@@ -51,6 +51,7 @@ export class AssignmentsViewWidget extends TreeWidget {
                 this.update();
             })
             .catch(err => {
+                console.log(err);
                 this.messageService.info(`Failed to fetch any assignment data...`);
             });
 
@@ -76,7 +77,6 @@ export class AssignmentsViewWidget extends TreeWidget {
                     console.log("Error occured while generating assignment resources:", err);
                     console.log("Za svaki slucaj i ovo: ", JSON.stringify(err));
                     this.messageService.info('An error occurred while generating assignment sources')
-                
                 });
             event.stopPropagation();
         } else {

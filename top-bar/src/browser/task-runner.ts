@@ -53,6 +53,7 @@ export class TaskRunner {
             return directoryTasks;
         } catch (err) {
             // TODO: Show error message via messageService...
+            console.log(`Could not load TaskDirectoryConfiguration: ${err}`);
             return {};
         }
     }
