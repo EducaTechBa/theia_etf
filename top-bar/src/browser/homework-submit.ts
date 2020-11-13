@@ -1,7 +1,7 @@
 import { injectable, inject } from 'inversify';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
-import { EditorManager, EditorWidget } from '@theia/editor/lib/browser';
+import { EditorManager } from '@theia/editor/lib/browser';
 import URI from '@theia/core/lib/common/uri';
 
 @injectable()
