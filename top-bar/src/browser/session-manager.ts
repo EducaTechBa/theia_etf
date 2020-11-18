@@ -11,13 +11,42 @@ export interface UserInfo {
 export class SessionManager {
 
     private userInfo: UserInfo | undefined;
+    private clipboard: string;
+    private readonly clipboardMessage = 'NO COPY ALLOWED :)';
 
     constructor() {
         this.ping();
+
+        document.addEventListener('copy', (e: ClipboardEvent) => {
+            e.preventDefault();
+            this.clipboard = e.clipboardData?.getData('text/plain') ?? '';
+
+            e.clipboardData?.setData('text/plain', this.clipboardMessage);
+            e.clipboardData?.setData('text/html', `<b>${this.clipboardMessage}</b>`);
+        });
+
+        document.addEventListener('paste', (e: ClipboardEvent) => {
+            console.log(`Pasting... ${JSON.stringify(e)}`);
+            console.log(`Should paste: ${this.clipboard}`);
+            e.stopPropagation();
+            e.preventDefault();
+            e.clipboardData?.setData('text/plain', this.clipboard);
+            e.clipboardData?.setData('text/html', this.clipboard);
+            return false;
+        });
+
+        document.addEventListener('cut', (e: ClipboardEvent) => {
+            e.preventDefault();
+            this.clipboard = e.clipboardData?.getData('text/plain') ?? '';
+
+            e.clipboardData?.setData('text/plain', this.clipboardMessage);
+            e.clipboardData?.setData('text/html', `<b>${this.clipboardMessage}</b>`);
+        });
+
     }
 
     async getUserInfo(): Promise<UserInfo> {
-        if(this.userInfo) {
+        if (this.userInfo) {
             return this.userInfo;
         }
 
@@ -36,7 +65,7 @@ export class SessionManager {
 
         console.log(data);
 
-        if(data.includes("ERROR")) {
+        if (data.includes("ERROR")) {
             window.location.href = '/';
             return;
         }
