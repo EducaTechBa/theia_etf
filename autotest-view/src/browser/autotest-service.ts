@@ -1,12 +1,13 @@
 import { injectable, inject } from "inversify";
 import { Emitter } from '@theia/core/lib/common/event';
-import { AssignmentDirectory, AssignmentFile, Autotester } from './autotester';
+import {AssignmentDirectory, Autotester, BinaryAssignmentFile} from './autotester';
 import { FileStatWithMetadata } from '@theia/filesystem/lib/common/files';
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
 import URI from '@theia/core/lib/common/uri';
 // @ts-ignore
 import { SessionManager } from 'top-bar/lib/browser/session-manager';
+import {BinaryBufferReadableStream} from "@theia/core/lib/common/buffer";
 
 interface AutotesterState {
     programs: Record<string, Program | undefined>
@@ -249,10 +250,13 @@ export class AutotestService {
             }));
 
         const assignmentFilesPromises = assignmentFiles.map(async file => {
-            const { value } = await this.fileService.read(file.uri);
+            const { value } = await this.fileService.readFileStream(file.uri);
+            const fileContentBuffer = await BinaryBufferReadableStream.toBuffer(value);
+            const byteArray = new Uint8Array(fileContentBuffer.buffer);
+
             return {
                 ...file,
-                content: value
+                content: byteArray
             };
         });
 
@@ -262,7 +266,7 @@ export class AutotestService {
         const assignmentDirsPromises = assignmentDirs
             .map(file => this.loadAssignmentDirectory(file.resource.toString(), baseURI));
 
-        const files: AssignmentFile[] = await Promise.all(assignmentFilesPromises);
+        const files: BinaryAssignmentFile[] = await Promise.all(assignmentFilesPromises);
         const subdirectories: AssignmentDirectory[] = await Promise.all(assignmentDirsPromises);
 
         return {

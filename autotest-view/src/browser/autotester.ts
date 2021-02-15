@@ -4,7 +4,7 @@ import * as JSZip from 'jszip';
 export interface AssignmentDirectory {
     uri: string;
     subdirectories: AssignmentDirectory[];
-    files: AssignmentFile[];
+    files: BinaryAssignmentFile[];
 }
 
 export interface AssignmentFile {
@@ -12,6 +12,12 @@ export interface AssignmentFile {
     name: string;
     content: string;
 };
+
+export interface BinaryAssignmentFile {
+    path: string;
+    name: string;
+    content: Uint8Array;
+}
 
 @injectable()
 export class Autotester {
@@ -77,7 +83,7 @@ export class Autotester {
         });
     }
 
-    private async traverse(directory: AssignmentDirectory, func: (dir: AssignmentFile) => void): Promise<void> {
+    private async traverse(directory: AssignmentDirectory, func: (dir: BinaryAssignmentFile) => void): Promise<void> {
         const subdirectoriesTraverse = directory.subdirectories.map(dir => this.traverse(dir, func));
         await Promise.all(subdirectoriesTraverse);
         
