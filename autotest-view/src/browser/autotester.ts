@@ -73,7 +73,11 @@ export class Autotester {
 
         await this.traverse(directory, file => zip.file(file.path, file.content));
 
-        const content = await zip.generateAsync({ type: 'blob' });
+        const content = await zip.generateAsync({
+            type: 'blob',
+            compression: 'DEFLATE',
+            compressionOptions: { level: 9 }
+        });
 
         const formData = new FormData();
         formData.append('program', content);
