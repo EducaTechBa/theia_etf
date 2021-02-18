@@ -99,8 +99,12 @@ export class AssignmentsViewWidget extends TreeWidget {
         const filesToOpen = assignment.files
             .filter(file => file.show)
             .map(file => {
-                const fileURI = new URI(`${assignmentDirectoryURI}/${file.filename}`);
-                return open(this.openerService, fileURI);
+                try {
+                    const fileURI = new URI(`${assignmentDirectoryURI}/${file.filename}`);
+                    return open(this.openerService, fileURI);
+                } catch(err) {
+                    console.log(`Error opening file: ${err}`)
+                }
             });
 
         await Promise.all(filesToOpen);
