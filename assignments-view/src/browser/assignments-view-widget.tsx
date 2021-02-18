@@ -97,7 +97,7 @@ export class AssignmentsViewWidget extends TreeWidget {
         }
 
         const filesToOpen = assignment.files
-            .filter(file => file.show && !file.binary)
+            .filter(file => file.show)
             .map(file => {
                 const fileURI = new URI(`${assignmentDirectoryURI}/${file.filename}`);
                 return open(this.openerService, fileURI);
