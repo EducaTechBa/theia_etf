@@ -6,6 +6,7 @@ import URI from '@theia/core/lib/common/uri';
 export class AssignmentGenerator {
 
     private static readonly BASE_URL = '';
+    private RETRY_TIMEOUT_MS = 1000;
 
     constructor(
         @inject(FileService) private readonly fileService: FileService,
@@ -22,39 +23,43 @@ export class AssignmentGenerator {
             console.log(`Directory ${assignmentDirectory} already exists...`);
         }
 
-        const { courseID, id, files } = assignment;
-        const filesWithURL = files.map(file => {
-            const url = this.makeURL(`/assignment/ws.php?action=getFile&course=${courseID}&external=1&task_direct=${id}&file=${file.filename}&replace=true`)
-            return {
-                ...file,
-                url
-            };
+        const filesToGenerate = assignment.files.map(file => {
+            this.retry(() => this.generateFile(assignmentDirectory, assignment, file))
         });
-
-        const promises = filesWithURL
-            .map(file =>
-                fetch(file.url, { credentials: 'include' })
-                    .then(res => res.text())
-                    .then(content => ({
-                        ...file,
-                        content
-                    }))
-            );
-        
-        const data = await Promise.all(promises);
-
-        const filesToGenerate = data.map(file => this.generateFile(assignmentDirectory, file));
         await Promise.all(filesToGenerate);
     }
 
-    private async generateFile(dirURI: string, file: any) {
-        if(file.binary) {
-            return;
+    private async retry(operation: Function) {
+        try {
+            await operation();
+        } catch(err) {
+            console.log(`Error generating file: ${err}`);
+            await this.delay(this.RETRY_TIMEOUT_MS);
+            await this.retry(operation);
         }
+    }
 
-        const path = `${dirURI}/${file.filename}`;
+    private delay(ms: number) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
 
-        await this.fileService.create(new URI(path), file.content);
+    private async generateFile(dirURI: string, assignment: Assignment, file: any) {
+        const content = await this.getFileContentFromServer(assignment, file)
+
+        if(!file.binary) {
+            const path = `${dirURI}/${file.filename}`;
+            await this.fileService.create(new URI(path), content);
+        }
+    }
+
+    private async getFileContentFromServer(assignment: Assignment, file: any): Promise<any> {
+        const { courseID, id } = assignment;
+        const url = this.makeURL(`/assignment/ws.php?action=getFile&course=${courseID}&external=1&task_direct=${id}&file=${file.filename}&replace=true`);
+        const res = await fetch(url, { credentials: 'include' });
+        if(res.status != 200) {
+            throw Error('Error getting file content');
+        }
+        return await res.text();
     }
 
 }
