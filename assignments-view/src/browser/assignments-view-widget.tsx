@@ -15,11 +15,14 @@ import { AssignmentsDataProvider } from './assignments-data-provider';
 import { AssignmentGenerator } from './assignments-generator';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
 import URI from '@theia/core/lib/common/uri';
+import { RetriableOperation } from './retriable-operation';
 
 @injectable()
 export class AssignmentsViewWidget extends TreeWidget {
     static readonly ID = 'assignments-view:widget';
     static readonly LABEL = 'Assignments View';
+
+    private readonly RETRY_TIMEOUT_MS = 1000;
 
     constructor(
         @inject(TreeProps) readonly props: TreeProps,
@@ -105,7 +108,9 @@ export class AssignmentsViewWidget extends TreeWidget {
             .forEach(async file => {
                 try {
                     const fileURI = new URI(`${assignmentDirectoryURI}/${file.filename}`);
-                    await open(this.openerService, fileURI);
+                    const operation = () => open(this.openerService, fileURI);
+                    const retriable = new RetriableOperation(operation, this.RETRY_TIMEOUT_MS);
+                    await retriable.run()
                 } catch(err) {
                     console.log(`Error opening file: ${err}`)
                 }

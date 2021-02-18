@@ -1,6 +1,7 @@
 import { injectable, inject } from 'inversify';
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
 import URI from '@theia/core/lib/common/uri';
+import { RetriableOperation } from './retriable-operation'
 
 @injectable()
 export class AssignmentGenerator {
@@ -24,23 +25,11 @@ export class AssignmentGenerator {
         }
 
         const filesToGenerate = assignment.files.map(file => {
-            this.retry(() => this.generateFile(assignmentDirectory, assignment, file))
+            const operation = () => this.generateFile(assignmentDirectory, assignment, file);
+            const retriable = new RetriableOperation(operation, this.RETRY_TIMEOUT_MS);
+            return retriable.run();
         });
         await Promise.all(filesToGenerate);
-    }
-
-    private async retry(operation: Function) {
-        try {
-            await operation();
-        } catch(err) {
-            console.log(`Error generating file: ${err}`);
-            await this.delay(this.RETRY_TIMEOUT_MS);
-            await this.retry(operation);
-        }
-    }
-
-    private delay(ms: number) {
-        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     private async generateFile(dirURI: string, assignment: Assignment, file: any) {
