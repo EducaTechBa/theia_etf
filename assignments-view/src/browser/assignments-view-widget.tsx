@@ -89,9 +89,11 @@ export class AssignmentsViewWidget extends TreeWidget {
     }
 
     private async assignmentDirectoryGeneration(assignment: Assignment) {
+        console.log('Starting assignment generation method...')
         const directoryExists = await this.workspaceService.containsSome([assignment.path]);
         const workspaceURI = this.workspaceService.workspace?.resource || '';
         const assignmentDirectoryURI = `${workspaceURI}/${assignment.path}`;
+        console.log('Done preparing directory uri based on assignemnt')
 
         if (!directoryExists) {
             this.messageService.info(`Generating sources for '${assignment.path}'...`);
@@ -102,6 +104,8 @@ export class AssignmentsViewWidget extends TreeWidget {
             }
             this.messageService.info(`Sources for ${assignment.path} generated successfully!`);
         }
+
+        console.log(JSON.stringify(assignment))
 
         assignment.files
             .filter(file => file.show)
@@ -115,6 +119,7 @@ export class AssignmentsViewWidget extends TreeWidget {
                     console.log(`Error opening file: ${err}`)
                 }
             });
+        console.log('End assignment generation and opening...')
     }
 
     protected isExpandable(node: TreeNode): node is ExpandableTreeNode {
