@@ -92,7 +92,11 @@ export class AssignmentsViewWidget extends TreeWidget {
 
         if (!directoryExists) {
             this.messageService.info(`Generating sources for '${assignment.path}'...`);
-            await this.assignmentGenerator.generateAssignmentSources(assignmentDirectoryURI, assignment)
+            try {
+                await this.assignmentGenerator.generateAssignmentSources(assignmentDirectoryURI, assignment)
+            } catch(err) {
+                console.log(`Error generating assignment sources: ${err}`);
+            }
             this.messageService.info(`Sources for ${assignment.path} generated successfully!`);
         }
 
