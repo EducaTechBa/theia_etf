@@ -100,18 +100,16 @@ export class AssignmentsViewWidget extends TreeWidget {
             this.messageService.info(`Sources for ${assignment.path} generated successfully!`);
         }
 
-        const filesToOpen = assignment.files
+        assignment.files
             .filter(file => file.show)
-            .map(file => {
+            .forEach(async file => {
                 try {
                     const fileURI = new URI(`${assignmentDirectoryURI}/${file.filename}`);
-                    return open(this.openerService, fileURI);
+                    await open(this.openerService, fileURI);
                 } catch(err) {
                     console.log(`Error opening file: ${err}`)
                 }
             });
-
-        await Promise.all(filesToOpen);
     }
 
     protected isExpandable(node: TreeNode): node is ExpandableTreeNode {
