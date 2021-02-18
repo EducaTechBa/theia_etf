@@ -16,6 +16,12 @@ export class AssignmentGenerator {
     }
 
     public async generateAssignmentSources(assignmentDirectory: string, assignment: Assignment) {
+        try {
+            await this.fileService.createFolder(new URI(assignmentDirectory));
+        } catch(_) {
+            console.log(`Directory ${assignmentDirectory} already exists...`);
+        }
+
         const { courseID, id, files } = assignment;
         const filesWithURL = files.map(file => {
             const url = this.makeURL(`/assignment/ws.php?action=getFile&course=${courseID}&external=1&task_direct=${id}&file=${file.filename}&replace=true`)
@@ -36,9 +42,6 @@ export class AssignmentGenerator {
             );
         
         const data = await Promise.all(promises);
-
-        await this.fileService.createFolder(new URI(assignmentDirectory));
-        
 
         const filesToGenerate = data.map(file => this.generateFile(assignmentDirectory, file));
         await Promise.all(filesToGenerate);
