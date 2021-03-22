@@ -15,7 +15,9 @@ import { AssignmentsDataProvider } from './assignments-data-provider';
 import { AssignmentGenerator } from './assignments-generator';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
 import URI from '@theia/core/lib/common/uri';
+import { FileService } from '@theia/filesystem/lib/browser/file-service';
 import { RetriableOperation } from './retriable-operation';
+import { FileOperationError, FileOperationResult } from '@theia/filesystem/lib/common/files';
 
 @injectable()
 export class AssignmentsViewWidget extends TreeWidget {
@@ -30,6 +32,7 @@ export class AssignmentsViewWidget extends TreeWidget {
         @inject(ContextMenuRenderer) contextMenuRenderer: ContextMenuRenderer,
         @inject(MessageService) private readonly messageService: MessageService,
         @inject(WorkspaceService) private readonly workspaceService: WorkspaceService,
+        @inject(FileService) private readonly fileService: FileService,
         @inject(OpenerService) private readonly openerService: OpenerService,
         @inject(AssignmentGenerator) private readonly assignmentGenerator: AssignmentGenerator,
     ) {
@@ -90,28 +93,34 @@ export class AssignmentsViewWidget extends TreeWidget {
 
     private async assignmentDirectoryGeneration(assignment: Assignment) {
         console.log('Starting assignment generation method...')
-        const directoryExists = await this.workspaceService.containsSome([assignment.path]);
         const workspaceURI = this.workspaceService.workspace?.resource || '';
-        const assignmentDirectoryURI = `${workspaceURI}/${assignment.path}`;
+        const assignmentDirectoryPath = `${workspaceURI}/${assignment.path}`;
+        const assignmentDirectoryURI = new URI(assignmentDirectoryPath);
         console.log('Done preparing directory uri based on assignemnt')
 
-        if (!directoryExists) {
-            this.messageService.info(`Generating sources for '${assignment.path}'...`);
-            try {
-                await this.assignmentGenerator.generateAssignmentSources(assignmentDirectoryURI, assignment)
-            } catch(err) {
-                console.log(`Error generating assignment sources: ${err}`);
+        try {
+            // Error thrown if file/directory not found
+            const dir = await this.fileService.resolve(assignmentDirectoryURI);
+            const directoryEmpty = dir.children === undefined;
+            if (directoryEmpty) {
+                await this.generateAssignmentSources(assignmentDirectoryPath, assignment);
             }
-            this.messageService.info(`Sources for ${assignment.path} generated successfully!`);
+        } catch(err) {
+            if (err instanceof FileOperationError && err.fileOperationResult === FileOperationResult.FILE_NOT_FOUND) {
+                await this.generateAssignmentSources(assignmentDirectoryPath, assignment);
+            } else {
+                console.log(`Error resolving assignment directory: ${err}`);
+                return;
+            }
         }
-
+        
         console.log(JSON.stringify(assignment))
 
         assignment.files
             .filter(file => file.show)
             .forEach(async file => {
                 try {
-                    const fileURI = new URI(`${assignmentDirectoryURI}/${file.filename}`);
+                    const fileURI = new URI(`${assignmentDirectoryPath}/${file.filename}`);
                     const operation = () => open(this.openerService, fileURI);
                     const retriable = new RetriableOperation(operation, this.RETRY_TIMEOUT_MS);
                     await retriable.run()
@@ -120,6 +129,16 @@ export class AssignmentsViewWidget extends TreeWidget {
                 }
             });
         console.log('End assignment generation and opening...')
+    }
+
+    private async generateAssignmentSources(assignmentDirectoryPath: string, assignment: Assignment) {
+        this.messageService.info(`Generating sources for '${assignment.path}'...`);
+        try {
+            await this.assignmentGenerator.generateAssignmentSources(assignmentDirectoryPath, assignment)
+        } catch(err) {
+            console.log(`Error generating assignment sources: ${err}`);
+        }
+        this.messageService.info(`Sources for ${assignment.path} generated successfully!`);
     }
 
     protected isExpandable(node: TreeNode): node is ExpandableTreeNode {
