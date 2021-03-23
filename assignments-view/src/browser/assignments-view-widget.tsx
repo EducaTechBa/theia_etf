@@ -102,7 +102,7 @@ export class AssignmentsViewWidget extends TreeWidget {
             // Error thrown if file/directory not found
             const dir = await this.fileService.resolve(assignmentDirectoryURI);
             const directoryEmpty = dir.children && dir.children.length > 0;
-            console.log(JSON.stringify(dir.children))
+            console.log(`Directory children: ${dir.children?.length}`);
             console.log(`IS DIRECTORY EMPTY: ${directoryEmpty}`)
             if (directoryEmpty) {
                 console.log('Should generate assignment sources even if directory empty');
