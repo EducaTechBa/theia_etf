@@ -358,7 +358,7 @@ export class AutotestService {
             return AutotestCancelStatus.NOT_USER_INVOKED;
         }
 
-        this.removeProgram(dirURI);
+        //this.removeProgram(dirURI);
         this.onTestsCanceledEmitter.fire({ program });
 
         return AutotestCancelStatus.CANCELED;
