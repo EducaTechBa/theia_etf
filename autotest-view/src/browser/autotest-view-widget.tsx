@@ -229,7 +229,7 @@ export class AutotestViewWidget extends ReactWidget {
 
     public async runTests(dirURI: string) {
         if (this.autotestService.isBeingTested(dirURI)) {
-            this.messageService.info("Allready running tests. Please wait...");
+            this.messageService.info("Already running tests. Please wait...");
             return;
         }
 

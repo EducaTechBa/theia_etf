@@ -102,4 +102,12 @@ export class Autotester {
         return data.data;
     }
 
+    public async cancelProgram(programID: number) {
+        const url = this.makeURL('cancelProgram', `id=${programID}`);
+        const res = await fetch(url);
+        const data = await res.json();
+
+        return data.data;
+    }
+
 }

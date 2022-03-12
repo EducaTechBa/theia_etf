@@ -54,6 +54,7 @@ export enum ProgramStatus {
     PROGRAM_NO_SOURCES_FOUND = "No sources to be tested found...",
     PROGRAM_CURRENTLY_TESTING = "Running tests...",
     PROGRAM_REJECTED = "Could not test program. Please try again...",
+    PROGRAM_CANCELED = "Testing is canceled",
 }
 
 export enum TestResultStatus {
@@ -201,7 +202,9 @@ export class AutotestService {
         if (program) {
             if (taskID !== program.taskID) {
                 program = await this.createProgram(program.id, taskID, programName, nonSilentAutotests.length, dirURI, isUserInvoked);
-            }
+            } else {
+                program.status = ProgramStatus.PROGRAM_AWAITING_TESTS;
+            } 
         } else {
             program = await this.createProgram(undefined, taskID, programName, nonSilentAutotests.length, dirURI, isUserInvoked);
         }
@@ -306,12 +309,16 @@ export class AutotestService {
     }
 
     private async getResults(dirURI: string) {
-        console.log("Getting resutls...");
+        console.log("Getting results...");
 
         const program = this.getProgram(dirURI);
 
         if (!program) {
             console.log('No program found...');
+            return;
+        }
+        if (program.status === ProgramStatus.PROGRAM_CANCELED) {
+            console.log('Testing is canceled');
             return;
         }
 
@@ -358,7 +365,9 @@ export class AutotestService {
             return AutotestCancelStatus.NOT_USER_INVOKED;
         }
 
-        //this.removeProgram(dirURI);
+        await this.autotester.cancelProgram(program.id);
+        program.status = ProgramStatus.PROGRAM_CANCELED;
+        program.result = undefined;
         this.onTestsCanceledEmitter.fire({ program });
 
         return AutotestCancelStatus.CANCELED;
