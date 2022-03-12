@@ -411,7 +411,9 @@ export class AutotestService {
     }
 
     private getRelativePath(uri: string, base: string) {
-        return uri.slice(base.length);
+        uri = uri.slice(base.length);
+        if (uri[0] == '/') uri = uri.slice(1);
+        return uri;
     }
 
     private async loadAutotestResultsFile(dirURI: string): Promise<string | undefined> {
