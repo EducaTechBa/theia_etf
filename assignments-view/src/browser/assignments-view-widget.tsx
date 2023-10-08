@@ -98,24 +98,13 @@ export class AssignmentsViewWidget extends TreeWidget {
         const assignmentDirectoryURI = new URI(assignmentDirectoryPath);
         console.log('Done preparing directory uri based on assignemnt')
 
+        this.messageService.info(`Generating sources for '${assignment.path}'...`);
         try {
-            // Error thrown if file/directory not found
-            const dir = await this.fileService.resolve(assignmentDirectoryURI);
-            const directoryEmpty = dir.children === undefined || dir.children.length == 0;
-            console.log(`Directory children: ${dir.children?.length}`);
-            console.log(`IS DIRECTORY EMPTY: ${directoryEmpty}`)
-            if (directoryEmpty) {
-                console.log('Should generate assignment sources even if directory empty');
-                await this.generateAssignmentSources(assignmentDirectoryPath, assignment);
-            }
+            await this.assignmentGenerator.generateAssignmentSources(assignmentDirectoryURI, assignment)
         } catch(err) {
-            if (err instanceof FileOperationError && err.fileOperationResult === FileOperationResult.FILE_NOT_FOUND) {
-                await this.generateAssignmentSources(assignmentDirectoryPath, assignment);
-            } else {
-                console.log(`Error resolving assignment directory: ${err}`);
-                return;
-            }
-        }
+            console.log(`Error generating assignment sources: ${err}`);
+         }
+        this.messageService.info(`Sources for ${assignment.path} generated successfully!`);
         
         console.log(JSON.stringify(assignment))
 
