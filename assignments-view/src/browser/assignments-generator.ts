@@ -43,7 +43,7 @@ export class AssignmentGenerator {
 
     private async getFileContentFromServer(assignment: Assignment, file: any): Promise<any> {
         const { courseID, id } = assignment;
-        const url = this.makeURL(`/assignment/ws.php?action=getFile&course=${courseID}&external=1&task_direct=${id}&file=${file.filename}&replace=true`);
+        const url = this.makeURL(`/api/v1/assignment/${courseID}/${id}/file/${file.filename}?replace=true`);
         const res = await fetch(url, { credentials: 'include' });
         if(res.status != 200) {
             throw Error('Error getting file content');

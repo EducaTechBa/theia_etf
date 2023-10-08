@@ -1,8 +1,10 @@
 interface CourseInfo {
     id: string;
+    year: string;
     name: string;
     abbrev: string;
     external: boolean;
+    str: string;
 }
 
 interface Directory {

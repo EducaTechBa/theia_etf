@@ -21,7 +21,7 @@ export class SessionManager {
             return this.userInfo;
         }
 
-        const res = await fetch('/services/refresh.php', {
+        const res = await fetch('/api/v1/refresh', {
             credentials: 'include',
         });
         const data = await res.json();
@@ -31,7 +31,7 @@ export class SessionManager {
     }
 
     private async ping() {
-        const res = await fetch('/zamger/ping.php');
+        const res = await fetch('/api/v1/zamger/ping');
         const data = await res.text();
 
         console.log(data);

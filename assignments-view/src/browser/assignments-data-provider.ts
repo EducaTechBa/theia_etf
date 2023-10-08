@@ -16,7 +16,7 @@ export class AssignmentsDataProvider {
     }
 
     private async getStudentCoursesInfo(): Promise<CourseInfo[]> {
-        const url = this.makeURL('/assignment/ws.php?action=courses');
+        const url = this.makeURL('/api/v1/course/user');
         const res = await fetch(url, {
             credentials: 'include'
         });
@@ -38,9 +38,9 @@ export class AssignmentsDataProvider {
     }
 
     private async getCourseData(courseInfo: CourseInfo): Promise<any> {
-        const external = courseInfo.external ? 'external=1' : '';
-        const courseURL = (id: string) => this.makeURL(`/assignment/ws.php?action=assignments&${external}&course=${id}`);
-
+        const courseStr = courseInfo.str;
+        const courseURL = (id: string) => this.makeURL(`/api/v1/assignment/${courseStr}?expandPaths=true`);
+ 
         return fetch(courseURL(courseInfo.id), {
             credentials: 'include'
         }).then(res => res.json())
@@ -48,7 +48,7 @@ export class AssignmentsDataProvider {
 
     private mapCourseDataToCourseDirectory(courseInfo: CourseInfo, courseData: any): Directory {
         const tutorials = courseData.data ?? [];
-        const subdirectories = tutorials.map((t: any) => this.mapTutorialDataToDirectory(courseInfo.id, t));
+        const subdirectories = tutorials.map((t: any) => this.mapTutorialDataToDirectory(courseInfo.str, t));
 
         return {
             id: courseInfo.id,

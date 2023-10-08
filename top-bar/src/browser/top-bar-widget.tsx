@@ -128,7 +128,9 @@ export class TopBarWidget extends ReactWidget {
     }
 
     private async handleLogoutButtonClick() {
-        window.location.href = '/index.php?logout';
+        await fetch('/api/v1/stop');
+        await fetch('/api/v1/logout');
+        window.location.href = '/';
     }
 
 }

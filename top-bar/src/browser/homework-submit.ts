@@ -38,8 +38,8 @@ export class HomeworkSubmit {
         }
         // filename query parameter is used by the service to determine the 
         // file directory... the homeworkFilePath is sufficient...
-        const url = `/zamger/slanje_zadace.php?zadaca=${homework.id}&zadatak=${homework.zadatak}&filename=${homeworkContentFilePath}`;
-
+        const url = `/api/v1/zamger/submit_homework?homework=${homework.id}&assignment=${homework.zadatak}&filename=${homeworkContentFilePath}`;
+ 
         await fetch(url, {
             method: 'GET',
             credentials: 'include'
