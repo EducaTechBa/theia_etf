@@ -40,10 +40,32 @@ export class HomeworkSubmit {
         // file directory... the homeworkFilePath is sufficient...
         const url = `/api/v1/zamger/submit_homework?homework=${homework.id}&assignment=${homework.zadatak}&filename=${homeworkContentFilePath}`;
  
-        await fetch(url, {
+        const res = await fetch(url, {
             method: 'GET',
             credentials: 'include'
         });
+        const data = await res.json();
+        
+        if (res.status == 200) {
+            const dialog = new ConfirmDialog({
+                title: 'Success',
+                msg: 'File submitted successfully',
+                ok: "Ok"
+            });
+            dialog.open();        
+        } else {
+            let message = "(" + res.status + ") ";
+            if (data.hasOwnProperty('message'))
+                message += data.message;
+            else
+                message += "Server error sending file. Please contact the administrator";
+            const dialog = new ConfirmDialog({
+                title: 'Error submitting file',
+                msg: message,
+                ok: "Ok"
+            });
+            dialog.open();        
+        }
     }
 
     public async isHomeworkAssignment(dirURI: string): Promise<boolean> {
