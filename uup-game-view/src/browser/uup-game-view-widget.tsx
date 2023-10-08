@@ -3,8 +3,9 @@ import { injectable, postConstruct, inject } from 'inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core';
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
-import { EditorManager } from '@theia/editor/lib/browser';
-import { Assignment, PowerupType, StudentData, GameService, ChallengeConfig, AssignmentDetails, TaskCategory, UsedPowerup, CourseInfo, Task} from './uup-game-service';
+import { EditorManager, EditorWidget } from '@theia/editor/lib/browser';
+//import { Assignment, PowerupType, StudentData, GameService, ChallengeConfig, AssignmentDetails, TaskCategory, UsedPowerup, Task} from './uup-game-service';
+import { Assignment, PowerupType, StudentData, GameServiceV11, ChallengeConfig, AssignmentDetails, TaskCategory, UsedPowerup, Task } from './uup-game-service-v11';
 import { ConfirmDialog, open, OpenerService } from '@theia/core/lib/browser';
 import { SelectDialog } from './select-dialogue';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
@@ -41,8 +42,8 @@ export class UupGameViewWidget extends ReactWidget {
     @inject(FileService)
     protected readonly fileService!: FileService;
 
-    @inject(GameService)
-    protected readonly gameService!: GameService;
+    @inject(GameServiceV11)
+    protected readonly gameServiceV11!: GameServiceV11;
 
     @inject(WorkspaceService)
     protected readonly workspaceService: WorkspaceService;
@@ -60,7 +61,7 @@ export class UupGameViewWidget extends ReactWidget {
     protected readonly miniBrowserOpenHandler: MiniBrowserOpenHandler;
 
     @inject(EditorManager)
-    protected readonly editorManager: EditorManager;
+    protected readonly editorManager!: EditorManager;
 
     private state: GameInformationState = {
         handlers: {},
@@ -86,7 +87,12 @@ export class UupGameViewWidget extends ReactWidget {
         }
     }
 
-    private studentCheck = false;
+    private studentCheck = true;
+    private gameRunning = true;
+    private showRealPoints = false;
+    private showTime = false;
+    private programDirectoryURI = '';
+    private timeSinceLastUpdatedTime = 0;
 
     @postConstruct()
     protected async init(): Promise < void> {
@@ -96,16 +102,22 @@ export class UupGameViewWidget extends ReactWidget {
         this.title.closable = true;
         this.title.iconClass = 'fa fa-gamepad'; // Gamepad Icon
         
-        const courses = await this.getStudentCoursesInfo();
-        for(const course of courses) {
-            if(course.abbrev==='UUP' || course.abbrev==='OR') {
-                this.studentCheck = true;
-                break;
-            }
+        if (localStorage.getItem('GAME_showRealPoints') === 'true')
+            this.showRealPoints = true;
+        if (localStorage.getItem('GAME_showTime') === 'true')
+            this.showTime = true;
+
+        this.editorManager.onCreated(editorWidget => this.handleEditorSwitch(editorWidget));
+        this.editorManager.onCurrentEditorChanged(editorWidget => this.handleEditorSwitch(editorWidget));
+
+        const initialActiveEditor = this.getInitialActiveEditor();
+        if (initialActiveEditor) {
+            this.handleEditorSwitch(initialActiveEditor)
         }
-        
-        try {
-            if(this.studentCheck) {
+
+        const response = await this.gameServiceV11.getGameStatus();
+        if (response.success) {
+            try {
                 this.messageService.info("Started initializing game information state");
                 const _initialState = await this.initializeGameInformationState();
                 this.setState(state => {
@@ -117,29 +129,31 @@ export class UupGameViewWidget extends ReactWidget {
                     state.taskCategories = _initialState.taskCategories,
                     state.studentData =  _initialState.studentData
                 });
+                setInterval(() => this.tick(), 1000);
             }
-
-            this.update();
+            catch(err : any) {
+                console.log("ERROR", JSON.stringify(err));
+                this.messageService.error("Failed fetching student data. UUP Game extension will not start.");
+            }
         }
-        catch(err : any) {
-            console.log("ERROR", JSON.stringify(err));
-            this.messageService.error("Failed fetching student data. UUP Game extension will not start.");
+        else if (response.code == 403) {
+            console.log("INFO", response.message);
+            this.studentCheck = false;
+            this.update()
+        }
+        else if (response.code == 400) {
+            console.log("INFO", response.message);
+            this.gameRunning = false;
+            this.update()
         }
     }
-    //TODO: Add error handling
+    
     private async initializeGameInformationState() : Promise<GameInformationState> {
-        const directoryExists = await this.workspaceService.containsSome(['UUP_GAME']);
-        const workspaceURI = this.workspaceService.workspace?.resource || '';
-        const gameDirectoryURI = `${workspaceURI}/UUP_GAME`;
-        
-        if(!directoryExists)
-            await this.fileService.createFolder(new URI(gameDirectoryURI));
-
-        const _assignments = await this.gameService.getAssignments();
-        const _powerupTypes = await this.gameService.getPowerupTypes();
-        const _challengeConfig = await this.gameService.getChallengeConfig();
-        const _taskCategories = await this.gameService.getTaskCategories();
-        const _studentData = await this.gameService.getStudentData(_assignments, _powerupTypes, _challengeConfig?.tasksRequired);
+        const _assignments = await this.gameServiceV11.getAssignments();
+        const _powerupTypes = await this.gameServiceV11.getPowerupTypes();
+        const _challengeConfig = await this.gameServiceV11.getChallengeConfig();
+        const _taskCategories = await this.gameServiceV11.getTaskCategories();
+        const _studentData = await this.gameServiceV11.getStudentData(_assignments, _powerupTypes, _challengeConfig?.tasksRequired);
         const _handlers = this.generateEmptyHandlers(_assignments);
         const _fileWatchers = this.generateWatchers(_assignments);
         return {
@@ -153,6 +167,43 @@ export class UupGameViewWidget extends ReactWidget {
             taskCategories: _taskCategories,
             studentData: _studentData
         }
+    }
+
+    private getInitialActiveEditor(): EditorWidget | undefined {
+        return this.editorManager.currentEditor;
+    }
+
+    private async handleEditorSwitch(editorWidget: EditorWidget | undefined) {
+        if (!editorWidget) {
+            return;
+        }
+
+        const uri = editorWidget.getResourceUri()?.toString();
+        this.programDirectoryURI = uri ?? '';
+    }
+    
+    private tick() {
+        const updateEvery = 60;
+        
+        const browserFocused = document.hasFocus();
+        if (browserFocused) {
+            const uri = this.programDirectoryURI;
+            if (uri !== undefined && uri.includes("/UUP_GAME/")) {
+                this.state.studentData.assignmentsData.forEach( (x: AssignmentDetails) => { 
+                    if (uri.includes("/UUP_GAME/" + x.path)) {
+                        x.assignmentTime++;
+                        x.taskTime++;
+                        this.updateAssignmentState(x);
+                        this.update();
+                        if (this.timeSinceLastUpdatedTime > updateEvery) {
+                            this.timeSinceLastUpdatedTime = -1;
+                            this.gameServiceV11.updateTaskTime(x);
+                        }
+                    }
+                });
+            }
+        }
+        this.timeSinceLastUpdatedTime++;
     }
 
     private setState(update: (state: GameInformationState) => void) {
@@ -171,7 +222,7 @@ export class UupGameViewWidget extends ReactWidget {
     }
 
     private createChangeEventListener(path : string) {
-        let uri = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME${path}`);
+        let uri = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME/${path}`);
         //let taskSpecificationURI = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME/${assignment.name}/task.html`);
         //let _taskSpecificationURI = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME/${assignment.name}/task.jpg`);
         //let taskSolutionFileURI = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME/${assignment.name}/main.c`);
@@ -186,7 +237,7 @@ export class UupGameViewWidget extends ReactWidget {
                         else if(file.name.match(/.+\.c$/))
                             await open(this.openerService, file.resource);
                         else if(file.name.match(/.+\.html$/))
-                            await this.miniBrowserOpenHandler.open(file.resource);                        
+                            await this.miniBrowserOpenHandler.open(file.resource);
                     }
                     // this.autotestViewWidget.refreshWidget(uri.toString());
                     this.autotestService.removeProgram(uri.toString());
@@ -196,7 +247,7 @@ export class UupGameViewWidget extends ReactWidget {
     }
 
     private async closeAllEditorsInFolder(path: string) {
-        let uri = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME${path}`);
+        let uri = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME/${path}`);
         let resolve = await this.fileService.resolve(uri);
         if(resolve.children?.length) {
             for(const file of resolve.children) {
@@ -205,36 +256,6 @@ export class UupGameViewWidget extends ReactWidget {
             }
         }
     }
-
-    
-    private async getStudentCoursesInfo(): Promise<CourseInfo[]> {
-        const url = '/assignment/ws.php?action=courses';
-        const res = await fetch(url, {
-            credentials: 'include'
-        });
-
-        const json = await res.json();
-
-        if(!json.data) return [];
-
-        return json.data.map((course: any) => ({
-            id: course.id,
-            name: course.name,
-            abbrev: course.abbrev,
-            external: course.external,
-        }));
-    }
-    /*
-    private async getAccessInfo(): Promise<boolean> {
-        const url = '/services/uup_game.php?action=check';
-        const res = await fetch(url, {
-            credentials: 'include'
-        });
-
-        const json = await res.json();
-        return json.success;
-    }
-    */
     private generateEmptyHandlers(assignments: Assignment[]) : Record<string, boolean> {
         assignments = assignments.filter( (x) => { return x.active;});
         let handlers : Record<string,boolean> = {};
@@ -293,7 +314,7 @@ export class UupGameViewWidget extends ReactWidget {
             this.setState(state => {
                 state.buyingPowerup = true;
             });
-            const response = await this.gameService.buyPowerup(powerupType);
+            const response = await this.gameServiceV11.buyPowerup(powerupType);
             if(response.success) {
                 this.messageService.info(`Powerup '${powerupType.name}' successfully bought.`);
                 const index = this.state.studentData?.unusedPowerups.findIndex( (x: any) => { return x.name == powerupType.name; });
@@ -330,9 +351,9 @@ export class UupGameViewWidget extends ReactWidget {
         if(!confirmation)
             return;
 
-        const directoryExists = await this.workspaceService.containsSome([`UUP_GAME${assignment.path}`]);
+        const directoryExists = await this.workspaceService.containsSome([`UUP_GAME/${assignment.path}`]);
         const workspaceURI = this.workspaceService.workspace?.resource || '';
-        const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME${assignment.path}`;
+        const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME/${assignment.path}`;
         //Create directory if it does not exist
         if (!directoryExists) {
             await this.fileService.createFolder(new URI(assignmentDirectoryURI));
@@ -342,7 +363,7 @@ export class UupGameViewWidget extends ReactWidget {
             }
         }  
         //Call service to start asssignment and get a response
-        const response = await this.gameService.startAssignment(assignment);
+        const response = await this.gameServiceV11.startAssignment(assignment);
         if(!response.success) {
             this.messageService.error(response.message);
             this.removeAssignmentFiles(assignment);
@@ -351,12 +372,12 @@ export class UupGameViewWidget extends ReactWidget {
             assignment.started = true;
             assignment.finished = false;
             assignment.currentTask = {
-                name: response.data.taskData.task_name,
-                taskNumber: response.data.taskData.task_number
+                name: response.data.task_name,
+                taskNumber: response.data.task_number
             }
-            this.messageService.info(response.data.message);
+            this.messageService.info(response.message);
             this.updateAssignmentState(assignment);
-            //Otvoriti nove fajlove
+            this.openFiles(assignment);
         }        
     }
     
@@ -376,7 +397,7 @@ export class UupGameViewWidget extends ReactWidget {
                 if(index != -1)
                     state.studentData.assignmentsData[index].buyingPowerUp = true;
             });
-            const response = await this.gameService.useHint(assignment);
+            const response = await this.gameServiceV11.useHint(assignment);
             if(response.success) {
                 this.messageService.info(`Hint: ${response.data.hint}`);
                 let hint = response.data.hint;
@@ -402,8 +423,8 @@ export class UupGameViewWidget extends ReactWidget {
         let _tasks : Task[] = [];
         for(const x of data) {
             _tasks.push({
-                name: x.task_name,
-                taskNumber: x.task_number
+                name: x.taskName,
+                taskNumber: x.taskNr
             });
         }
         return _tasks;
@@ -416,17 +437,14 @@ export class UupGameViewWidget extends ReactWidget {
         let type_id = -1;
         if(!!scPowerup)
             type_id = scPowerup.id;
-        const tasksResponse = await this.gameService.getSecondChanceAvailableTasks(assignment, type_id);
+        const tasksResponse = await this.gameServiceV11.getSecondChanceAvailableTasks(assignment, type_id);
         if(!tasksResponse.success) {
             this.messageService.error(tasksResponse.message);
             return;
         }
         const tasks = this.mapTasksData(tasksResponse.data);
         if(tasks.length === 0) {
-            this.messageService.error(`You do not have any available task to go back to. This error only occurs
-                                       if you have completed all tasks in assignment with all tests successful or
-                                       if you have already used this power-up on all tasks that haven't been completed
-                                       successfully. You can only return to specific task once!`);
+            this.messageService.error(`You do not have any available task to go back to. If you think this is an error, please contact your teacher.`);
             return;
         }
         const result = await new SelectDialog({
@@ -450,24 +468,25 @@ export class UupGameViewWidget extends ReactWidget {
             await this.generateAssignmentFiles(assignment);
             createdFolders = true;
         }
-        const response = await this.gameService.useSecondChance(assignment, result);
+        const response = await this.gameServiceV11.useSecondChance(assignment, result);
         if(response.success) {
-            this.messageService.info(`You are now back to task ${response.data.data.task_name} [Task ${response.data.data.task_number}].`);
+            this.messageService.info(`You are now back to task ${response.data.task_name} [Task ${response.data.task_number}].`);
             const index = this.state.studentData?.unusedPowerups.findIndex( (x: any) => { return x.name == 'Second Chance'; });
             this.state.studentData.unusedPowerups[index].amount -= 1;
             //Update current task
             assignment.currentTask = {
-                name: response.data.data.task_name,
-                taskNumber: response.data.data.task_number
+                name: response.data.task_name,
+                taskNumber: response.data.task_number
             };
             //Set previous points in assignments state
-            assignment.previousPoints = response.data.data.previous_points;
+            assignment.previousPoints = response.data.previous_points;
             //Update hint if existing
             assignment.taskHint = "";
+            assignment.taskTime = response.data.task_time;
             assignment.powerupsUsed.push({name: "Second Chance", taskNumber: assignment.currentTask.taskNumber});
             const pIndex = assignment.powerupsUsed.findIndex( (x: any) => { return x.name == 'Hint' && x.taskNumber == assignment.currentTask.taskNumber });
             if( pIndex != -1) {
-                let usedHintResponse = await this.gameService.getUsedHint(assignment.id, assignment.currentTask.taskNumber);
+                let usedHintResponse = await this.gameServiceV11.getUsedHint(assignment.id, assignment.currentTask.taskNumber);
                 assignment.taskHint = usedHintResponse.data.hint;
             }
             if(assignment.finished) {
@@ -509,19 +528,20 @@ export class UupGameViewWidget extends ReactWidget {
                 if(index != -1)
                     state.studentData.assignmentsData[index].buyingPowerUp = true;
             });
-            const response = await this.gameService.switchTask(assignment);
+            const response = await this.gameServiceV11.useSwitchTask(assignment);
             if(response.success) {
-                this.messageService.info(`Power-up 'Switch Task' has been used successfully. New task files are now in your workspace. Good luck!`);
+                this.messageService.info(`Powerup 'Switch Task' has been used successfully. New task files are now in your workspace. Good luck!`);
                 const index = this.state.studentData?.unusedPowerups.findIndex( (x: any) => { return x.name == 'Switch Task'; });
                 this.state.studentData.unusedPowerups[index].amount -= 1;
                 //Update current assignment
                 assignment.powerupsUsed.push({name: "Switch Task", taskNumber: assignment.currentTask.taskNumber}); 
                 assignment.currentTask = {
-                    name: response.data.data.taskData.task_name,
-                    taskNumber: response.data.data.taskData.task_number
+                    name: response.data.task_name,
+                    taskNumber: response.data.task_number
                 }
                 assignment.previousPoints = -1;
                 assignment.taskHint = "";
+                assignment.taskTime = 0;
                 this.updateAssignmentState(assignment);
             } else {
                 this.messageService.error(response.message);
@@ -536,9 +556,9 @@ export class UupGameViewWidget extends ReactWidget {
     }
 
     private async generateAssignmentFiles(assignment: AssignmentDetails) {
-        const directoryExists = await this.workspaceService.containsSome([`UUP_GAME${assignment.path}`]);
+        const directoryExists = await this.workspaceService.containsSome([`UUP_GAME/${assignment.path}`]);
         const workspaceURI = this.workspaceService.workspace?.resource || '';
-        const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME${assignment.path}`;
+        const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME/${assignment.path}`;
 
         if (!directoryExists) {
             await this.fileService.createFolder(new URI(assignmentDirectoryURI));
@@ -550,9 +570,9 @@ export class UupGameViewWidget extends ReactWidget {
     }
 
     private async removeAssignmentFiles(assignment: AssignmentDetails) {
-        const directoryExists = await this.workspaceService.containsSome([`UUP_GAME${assignment.path}`]);
+        const directoryExists = await this.workspaceService.containsSome([`UUP_GAME/${assignment.path}`]);
         const workspaceURI = this.workspaceService.workspace?.resource || '';
-        const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME${assignment.path}`;
+        const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME/${assignment.path}`;
 
         if (directoryExists) {
             await this.fileService.delete(new URI(assignmentDirectoryURI), { recursive:true });
@@ -576,11 +596,56 @@ export class UupGameViewWidget extends ReactWidget {
         return htmlNode;            
     }
 
+    private async openFiles(assignment: AssignmentDetails) {
+        if (assignment.finished) return;
+        let path = assignment.path;
+
+        const directoryExists = await this.workspaceService.containsSome([`UUP_GAME/${path}`]);
+        if (!directoryExists) {
+            const dialog = new ConfirmDialog({
+                title: 'Files for assignment do not exist',
+                maxWidth: 500,
+                msg: `Do you want to create default files for this assignment?`,
+                ok: "Yes",
+                cancel: "No"
+            });
+            const confirmation = await dialog.open();
+            if(confirmation) {
+                const response = await this.gameServiceV11.restoreTask(assignment);
+                if(response.success) {
+                    this.openFiles(assignment);
+                } else {
+                    this.messageService.error(response.message);
+                }
+            }
+            return;
+        }
+        
+        let uri = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME/${path}`);
+        let resolve = await this.fileService.resolve(uri);
+        // TODO use assignment files
+        if(resolve.children?.length) {
+            for(const file of resolve.children) {
+                if(file.isDirectory || file.name[0]==='.')
+                    continue;
+                else if(file.name.match(/.+\.c$/))
+                    await open(this.openerService, file.resource);
+                else if(file.name.match(/.+\.html$/)) {
+                    await this.miniBrowserOpenHandler.open(file.resource, {
+                        mode: 'reveal',
+                        //widgetOptions: { mode: 'open-to-right' }
+                    });
+                }
+            }
+        }
+
+    }
+
     //TODO:
     // zatvoriti i otvoriti fajlove
     private async turnInCurrentTask(assignment: AssignmentDetails) {
         const workspaceURI = this.workspaceService.workspace?.resource || '';
-        const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME${assignment.path}`;
+        const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME/${assignment.path}`;
         //const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME`;
 
         const dialog = new ConfirmDialog({
@@ -603,6 +668,7 @@ export class UupGameViewWidget extends ReactWidget {
                 const testStatus = await this.autotestService.runTests(assignmentDirectoryURI, false);
                 if(!testStatus.success) {
                     this.messageService.error("Could not run tests, check if tests are already running and all files are there.");
+                    console.log("success " + testStatus.success + " status " + testStatus.status);
                     this.setState(state => {
                         let index = state.studentData.assignmentsData.findIndex( x => x.id == assignment.id );
                         if(index != -1)
@@ -660,15 +726,17 @@ export class UupGameViewWidget extends ReactWidget {
                         return;
                     }
                     await this.closeAllEditorsInFolder(assignment.path);
-                    const response = await this.gameService.turnInTask(assignment, results);
+                    const response = await this.gameServiceV11.turnInTask(assignment);
                     if(response.success) {
                         this.messageService.info(response.message);
+                        if (response.data.taskData.reason.length > 0)
+                            this.messageService.info("You are back on task " + response.data.taskData.task_name + " because: " + response.data.taskData.reason);
                         if(assignment.previousPoints == -1)
                             assignment.tasksTurnedIn += 1;
                         //Update assignment and set state
                         assignment.currentTask = {
-                            name: response.data.data.taskData.task_name,
-                            taskNumber: response.data.data.taskData.task_number
+                            name: response.data.taskData.task_name,
+                            taskNumber: response.data.taskData.task_number
                         };
                         if(results.passed_tests === results.total_tests) {
                             assignment.tasksFullyFinished += 1;
@@ -683,26 +751,29 @@ export class UupGameViewWidget extends ReactWidget {
                             assignment.points -= assignment.previousPoints;
                             assignment.previousPoints = -1;
                         }
-                        assignment.points += response.data.data.points;
-                        this.state.studentData.points += response.data.data.points;
-                        this.state.studentData.tokens += response.data.data.tokens;
+                        assignment.points += response.data.points;
+                        this.state.studentData.points += response.data.points;
+                        this.state.studentData.tokens += response.data.tokens;
                         //Checking for additional tokens
-                        let _additionalTokens = response.data.data.additionalTokens;
-                        this.messageService.info(`You earned ${Math.floor(response.data.data.points*1000)} XP and ${response.data.data.tokens} tokens.`);
+                        let _additionalTokens = response.data.additionalTokens;
+                        this.messageService.info(`You earned ${Math.floor(response.data.points*1000)} XP and ${response.data.tokens} tokens.`);
                         if(Object.keys(_additionalTokens).length !== 0 && _additionalTokens.constructor === Object) {
                             if(!!_additionalTokens.amount && _additionalTokens.amount != 0) 
                                 this.messageService.info(`Congratulations! You earned additional ${_additionalTokens.amount} tokens.
                                 Reason: ${_additionalTokens.reason}`)
                             this.state.studentData.tokens += _additionalTokens.amount;
                         }
-                        if(response.data.data.assignmentDone) {
+                        if(response.data.assignmentDone) {
                             assignment.finished = true;
                             assignment.tasksTurnedIn = this.getTotalTasks();
                             this.messageService.info(`Congratulations! You have completed all tasks in assignment '${assignment.name}.'`);
                             this.removeAssignmentFiles(assignment);
                         }
                         assignment.taskHint = "";
+                        assignment.taskTime = 0;
                         this.updateAssignmentState(assignment);
+                        if (!assignment.finished)
+                            this.openFiles(assignment);
                     } else {
                         this.messageService.error(response.message);
                     }
@@ -732,23 +803,25 @@ export class UupGameViewWidget extends ReactWidget {
     }
 
     private openGameHelpDialog() {
-        new GameHelpDialog({title:"UUP GAME INFORMATION & HELP"}).open();
+        let helpDialog = new GameHelpDialog({title:"UUP GAME INFORMATION & HELP"});
+        helpDialog.setGameViewWidget(this);
+        helpDialog.open();
     }
-    /*
-    private async openGameRules() {
-        let uri = new URI(this.workspaceService.workspace?.resource+'/UUP_GAME/Lesson 1/task.html');
-        //open(this.openerService, uri, { preview: 'true' } );
-        this.miniBrowserOpenHandler.open(uri);
-    }
-    */
     protected render(): React.ReactNode {  
         let content;
-        if(!this.studentCheck) {
+        if(!this.gameRunning) {
+            content = <div id='uup-game-container'>
+                        <div style={{margin: "10px 10px 10px 10px !important"}}>{this.renderAlertBox('error', 'fa fa-times-circle', 'Game not running',
+                                `UUP Game is currently down for maintenance.`)}
+                        </div>
+                      </div>
+        }
+        else if(!this.studentCheck) {
             content = <div id='uup-game-container'>
                         <div style={{margin: "10px 10px 10px 10px !important"}}>{this.renderAlertBox('error', 'fa fa-times-circle', 'Access denied',
-                                `You are not enrolled into course UUP or OR in current academic year.
+                                `You are not enrolled into a course that supports UUP Game in current academic year.
                                 If you think there has been a mistake contact your professor.`)}
-                        </div>                          
+                        </div>
                       </div>
         }
         else content = <div id='uup-game-container'>
@@ -819,6 +892,13 @@ export class UupGameViewWidget extends ReactWidget {
             xp = 1000;
         }
         /*   <span className="game-rules"><a href="#" onClick= { (e) => {e.preventDefault(); this.openGameRules()} }>GAME RULES</a></span> */
+        
+        let pointsDisplay: React.ReactNode;
+        if (this.showRealPoints)
+            pointsDisplay = "Points: " + points;
+        else
+            pointsDisplay = "XP: " + xp + "/1000";
+        
         return <div className='student-info'>
             <div className="student-header">
                 <span>{header}</span>
@@ -834,7 +914,7 @@ export class UupGameViewWidget extends ReactWidget {
                     <span className="progress-bar-span">{progress.toFixed(2)}%</span>
                     <div className="progress-bar-xp" style={{width: `${progress.toFixed(2)}%`}}></div>
             </div>
-            <span className="student-xp">XP: {xp}/1000</span>
+            <span className="student-xp">{pointsDisplay}</span>
             {this.renderPowerupStatus()}
         </div>
     }
@@ -871,6 +951,23 @@ export class UupGameViewWidget extends ReactWidget {
         </div>;
     
     }
+    
+    private timeToHMS(time: number) : string {
+        let result = '';
+        let hours = Math.floor(time / 3600);
+        if (hours > 0) {
+            if (hours < 10) result += '0';
+            result += hours + ':';
+            time = time - hours * 3600;
+        }
+        let minutes = Math.floor(time / 60);
+        if (minutes < 10) result += '0';
+        result += minutes + ':';
+        time = time - minutes * 60;
+        if (time < 10) result += '0';
+        result += time;
+        return result;
+    }
 
     private renderAssignmentDetails(assignment: AssignmentDetails) : React.ReactNode {
         let content: React.ReactNode;
@@ -900,8 +997,25 @@ export class UupGameViewWidget extends ReactWidget {
         else if(!assignment.finished) {
             let totalTasks = this.getTotalTasks();
             let percent = ((assignment.tasksTurnedIn/totalTasks)*100).toFixed(2);         
+            let taskTimeContent: React.ReactNode;
+            let assignmentTimeContent: React.ReactNode;
+            if (this.showTime) {
+                let taskTime = 0;
+                let assignmentTime = 0
+                const index = this.state.studentData.assignmentsData.findIndex( x => x.id == assignment.id);
+                if (index >= 0) {
+                     taskTime = this.state.studentData.assignmentsData[index].taskTime;
+                     assignmentTime = this.state.studentData.assignmentsData[index].assignmentTime;
+                }
+                taskTimeContent =
+                    <span className="span">Time spent on task: {this.timeToHMS(taskTime)}</span>
+                assignmentTimeContent =
+                    <span className="span">Time spent on assignment: {this.timeToHMS(assignmentTime)}</span> 
+            }
+            
             content = 
             <div>
+                <span className="open-files"><button onClick={ () => {this.openFiles(assignment)} }><i className="fa fa-search" aria-hidden="true"></i> Open</button></span>
                 <span className="assignment-progress">Assignment Progress</span>
                 <div className="progress-bar">
                     <span className="progress-bar-span">{percent}%</span>
@@ -913,6 +1027,9 @@ export class UupGameViewWidget extends ReactWidget {
                     <span className="span">Tasks fully finished: {assignment.tasksFullyFinished}</span>
                     <span className="span">Current task: {assignment.currentTask.taskNumber}</span>
                     <span className="span">Task name: {assignment.currentTask.name}</span> 
+                    {taskTimeContent}
+                    {assignmentTimeContent}
+                    
                     <div className={`collapse ${ assignment.tasksFullyFinished<this.state.challengeConfig.tasksRequired ? ' in' : ''}`}>
                         {this.renderAlertBox('warning', 'fa fa-exclamation-circle', 'Warning',
                         `You need to complete ${this.state.challengeConfig.tasksRequired-assignment.tasksFullyFinished}
@@ -988,6 +1105,26 @@ export class UupGameViewWidget extends ReactWidget {
 
     protected displayMessage(): void {
         this.messageService.info('Congratulations: UupGameView Widget Successfully Created!');
+    }
+    
+    public getShowRealPoints(): boolean {
+        return this.showRealPoints;
+    }
+    
+    public setShowRealPoints(value : boolean): void {
+        this.showRealPoints = value;
+        this.update();
+        localStorage.setItem('GAME_showRealPoints', JSON.stringify(value));
+    }
+    
+    public getShowTime(): boolean {
+        return this.showTime;
+    }
+    
+    public setShowTime(value : boolean): void {
+        this.showTime = value;
+        this.update();
+        localStorage.setItem('GAME_showTime', JSON.stringify(value));
     }
 
 }

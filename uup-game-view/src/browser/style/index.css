@@ -107,11 +107,17 @@
     margin-top: 10px;
 }
 
+.open-files {
+    display:inline-block;
+    text-align: center;
+    width: 100%;
+    padding-top: 10px;
+}
+
 .assignment-progress {
     display:inline-block;
     text-align: center;
     width: 100%;
-    padding-top: 10px; 
 }
 
 .student-header {
