@@ -100,7 +100,7 @@ export class AutotestViewWidget extends ReactWidget {
         this.setState(state => {
             state.statusMessage = statusMessage;
             state.progressMessage = isBeingTested ? completionMessage : queueMessage;
-            state.autotestResults = [];
+            state.autotestResults = program.result?.testResults ?? [];
             state.isRunningTests = true;
         });
     }

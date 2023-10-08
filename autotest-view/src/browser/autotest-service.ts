@@ -70,6 +70,13 @@ export enum TestResultStatus {
     TEST_INTERNAL_ERROR = "Internal server error",
     TEST_UNZIP_FAILED = "Unzip failed",
     TEST_TOOL_FAILED = "Execution tool failed",
+    TEST_STARTER_CODE = "Starter code was changed",
+    TEST_FORBIDDEN = "Forbidden code",
+    TEST_FORBIDDEN_ARRAY = "Arrays are forbidden",
+    TEST_FORBIDDEN_GLOBAL = "Globals are forbidden",
+    TEST_MISSING = "Required code is missing",
+    TEST_MISSING_SYMBOL = "Required symbol is missing",
+    TEST_FORBIDDEN_SYMBOL = "Forbidden symbol",
 }
 
 export interface AutotestRunInfo {
@@ -121,6 +128,19 @@ const integerToTestResultStatusMapping: Record<number, TestResultStatus> = {
     10: TestResultStatus.TEST_INTERNAL_ERROR,
     11: TestResultStatus.TEST_UNZIP_FAILED,
     12: TestResultStatus.TEST_TOOL_FAILED,
+}
+ 
+
+// TODO: Find a way to avoid this -_-
+const integerToParserStatusMapping: Record<number, TestResultStatus> = {
+    1: TestResultStatus.TEST_SUCCESS,
+    2: TestResultStatus.TEST_STARTER_CODE,
+    3: TestResultStatus.TEST_FORBIDDEN,
+    4: TestResultStatus.TEST_FORBIDDEN_ARRAY,
+    5: TestResultStatus.TEST_FORBIDDEN_GLOBAL,
+    6: TestResultStatus.TEST_MISSING,
+    7: TestResultStatus.TEST_MISSING_SYMBOL,
+    8: TestResultStatus.TEST_FORBIDDEN_SYMBOL,
 }
 
 @injectable()
@@ -325,14 +345,26 @@ export class AutotestService {
         const responseResult = await this.autotester.getResults(program.id);
         program.status = this.integerToProgramStatus(responseResult.status);
 
-        const testResultsObjects = responseResult.test_results ?? [];
+        let testResults: TestResult[] = [];
+        if (responseResult.test_results) {
+            const testResultObjects = Object.entries(responseResult.test_results);
+            testResults = testResultObjects.map(([key, value]) => {
+                const result = value as any;
+                const id = Number(key);
+                const success = result.success as boolean;
+                const status = (result.status == 2) ? this.integerToParserStatus(result.tools.parse.status) : this.integerToTestResultStatus(result.status);
+
+                return { id, success, status };
+            });
+        }
+
 
         const result: Result = {
             inQueue: responseResult.queue_items ?? 0,
             isWaiting: program.status === ProgramStatus.PROGRAM_AWAITING_TESTS,
             isBeingTested: program.status === ProgramStatus.PROGRAM_CURRENTLY_TESTING,
-            completedTests: Object.entries(testResultsObjects).length,
-            testResults: [],
+            completedTests: testResults.length,
+            testResults: testResults,
         };
 
         program.result = result;
@@ -449,7 +481,8 @@ export class AutotestService {
                 const result = value as any;
                 const id = Number(key);
                 const success = result.success as boolean;
-                const status = this.integerToTestResultStatus(result.status);
+                const status = (result.status == 2) ? this.integerToParserStatus(result.tools.parse.status) : this.integerToTestResultStatus(result.status);
+
                 return { id, success, status };
             });
         }
@@ -494,6 +527,10 @@ export class AutotestService {
 
     private integerToTestResultStatus(status: number): TestResultStatus {
         return integerToTestResultStatusMapping[status];
+    }
+
+    private integerToParserStatus(status: number): TestResultStatus {
+        return integerToParserStatusMapping[status];
     }
 
     public isBeingTested(dirURI: string): boolean {
