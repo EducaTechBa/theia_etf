@@ -2,6 +2,7 @@ import { injectable, inject } from 'inversify';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
 import { EditorManager } from '@theia/editor/lib/browser';
+import { ConfirmDialog } from '@theia/core/lib/browser';
 import URI from '@theia/core/lib/common/uri';
 
 @injectable()
@@ -39,7 +40,7 @@ export class HomeworkSubmit {
         // filename query parameter is used by the service to determine the 
         // file directory... the homeworkFilePath is sufficient...
         const url = `/api/v1/zamger/submit_homework?homework=${homework.id}&assignment=${homework.zadatak}&filename=${homeworkContentFilePath}`;
- 
+
         const res = await fetch(url, {
             method: 'GET',
             credentials: 'include'

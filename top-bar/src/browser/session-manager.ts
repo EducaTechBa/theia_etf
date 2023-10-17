@@ -101,7 +101,6 @@ export class SessionManager {
         try {
             const res = await fetch('/api/v1/zamger/ping');
             if (res.status == 200) {
-                const data = await res.text();
                 this.delay(100000).then(() => this.ping());
             } else {
                 const dialog = new ConfirmDialog({
