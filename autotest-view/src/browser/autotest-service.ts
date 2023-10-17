@@ -28,7 +28,6 @@ export interface Program {
     isUserInvoked: boolean,
     result?: Result;
     rawResults: string;
-    
 }
 
 // TODO: Move Program[status | totalTests] to Result
@@ -115,6 +114,7 @@ const integerToProgramStatusMapping: Record<number, ProgramStatus> = {
     6: ProgramStatus.PROGRAM_NO_SOURCES_FOUND,
     7: ProgramStatus.PROGRAM_CURRENTLY_TESTING,
     8: ProgramStatus.PROGRAM_REJECTED,
+    9: ProgramStatus.PROGRAM_CANCELED,
 }
 
 // TODO: Find a way to avoid this -_-
@@ -341,12 +341,10 @@ export class AutotestService {
             console.log('No program found...');
             return;
         }
-        if (program.status === ProgramStatus.PROGRAM_CANCELED) {
-            console.log('Testing is canceled');
-            return;
-        }
+        const wasCanceled = (program.status === ProgramStatus.PROGRAM_CANCELED);
 
         const responseResult = await this.autotester.getResults(program.id);
+        if (wasCanceled) responseResult.status = 9;
         program.rawResults = responseResult;
         program.status = this.integerToProgramStatus(responseResult.status);
 
