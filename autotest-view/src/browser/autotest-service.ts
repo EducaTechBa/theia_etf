@@ -27,6 +27,8 @@ export interface Program {
     totalTests: number;
     isUserInvoked: boolean,
     result?: Result;
+    rawResults: string;
+    
 }
 
 // TODO: Move Program[status | totalTests] to Result
@@ -78,6 +80,7 @@ export enum TestResultStatus {
     TEST_MISSING_SYMBOL = "Required symbol is missing",
     TEST_FORBIDDEN_SYMBOL = "Forbidden symbol",
 }
+
 
 export interface AutotestRunInfo {
     success: boolean;
@@ -314,6 +317,7 @@ export class AutotestService {
             uri,
             isUserInvoked,
             taskID,
+            rawResults: '',
         };
     }
 
@@ -343,6 +347,7 @@ export class AutotestService {
         }
 
         const responseResult = await this.autotester.getResults(program.id);
+        program.rawResults = responseResult;
         program.status = this.integerToProgramStatus(responseResult.status);
 
         let testResults: TestResult[] = [];
@@ -373,6 +378,7 @@ export class AutotestService {
         if (program.status === ProgramStatus.PROGRAM_AWAITING_TESTS
             || program.status === ProgramStatus.PROGRAM_CURRENTLY_TESTING) {
             this.onTestsUpdateEmitter.fire({ program });
+            await this.writeAutotestResultsFile(dirURI, JSON.stringify(responseResult, null, 4));
             await this.delay(this.POLL_TIMEOUT_MS).then(() => this.getResults(dirURI));
             return;
         }
@@ -511,6 +517,7 @@ export class AutotestService {
             result,
             taskID: -1,
             isUserInvoked: false,
+            rawResults: '',
         };
 
         return program;
@@ -570,7 +577,8 @@ export class AutotestService {
 
     public async openResultsPage(dirURI: string, testID: string) {
         const autotestContent = await this.loadAutotestFile(dirURI);
-        const resultsContent = await this.loadAutotestResultsFile(dirURI);
+        const program = this.state.programs[dirURI];
+        const resultsContent = (program === undefined) ? await this.loadAutotestResultsFile(dirURI) : JSON.stringify(program.rawResults);
 
         if (autotestContent === undefined || resultsContent === undefined) {
             return undefined;
