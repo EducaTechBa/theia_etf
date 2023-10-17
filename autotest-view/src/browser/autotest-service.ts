@@ -40,7 +40,7 @@ export interface Result {
 }
 
 export interface TestResult {
-    id: number;
+    id: string;
     success: boolean;
     status: TestResultStatus;
 }
@@ -129,7 +129,7 @@ const integerToTestResultStatusMapping: Record<number, TestResultStatus> = {
     11: TestResultStatus.TEST_UNZIP_FAILED,
     12: TestResultStatus.TEST_TOOL_FAILED,
 }
- 
+
 
 // TODO: Find a way to avoid this -_-
 const integerToParserStatusMapping: Record<number, TestResultStatus> = {
@@ -350,7 +350,7 @@ export class AutotestService {
             const testResultObjects = Object.entries(responseResult.test_results);
             testResults = testResultObjects.map(([key, value]) => {
                 const result = value as any;
-                const id = Number(key);
+                const id = key;
                 const success = result.success as boolean;
                 const status = (result.status == 2) ? this.integerToParserStatus(result.tools.parse.status) : this.integerToTestResultStatus(result.status);
 
@@ -433,8 +433,6 @@ export class AutotestService {
             }
         }
         return undefined;
-            return undefined;
-        }
     }
 
     private async writeAutotestResultsFile(dirURI: string, content: string): Promise<FileStatWithMetadata> {
@@ -489,7 +487,7 @@ export class AutotestService {
             const testResultObjects = Object.entries(data.test_results);
             testResults = testResultObjects.map(([key, value]) => {
                 const result = value as any;
-                const id = Number(key);
+                const id = key;
                 const success = result.success as boolean;
                 const status = (result.status == 2) ? this.integerToParserStatus(result.tools.parse.status) : this.integerToTestResultStatus(result.status);
 
@@ -570,7 +568,7 @@ export class AutotestService {
         return res.text();
     }
 
-    public async openResultsPage(dirURI: string, testID: number) {
+    public async openResultsPage(dirURI: string, testID: string) {
         const autotestContent = await this.loadAutotestFile(dirURI);
         const resultsContent = await this.loadAutotestResultsFile(dirURI);
 
@@ -598,7 +596,7 @@ export class AutotestService {
         const hiddenField2 = document.createElement("input");
         hiddenField2.setAttribute("type", "hidden");
         hiddenField2.setAttribute("name", "test");
-        hiddenField2.setAttribute("value", testID.toString());
+        hiddenField2.setAttribute("value", testID);
         form.appendChild(hiddenField2);
         document.body.appendChild(form);
 

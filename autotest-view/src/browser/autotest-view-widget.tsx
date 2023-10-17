@@ -219,12 +219,12 @@ export class AutotestViewWidget extends ReactWidget {
         }
     }
 
-    private async handleOpenTestResult(taskID: number) {
+    private async handleOpenTestResult(testID: string) {
         if (this.state.programDirectoryURI === undefined) {
             return;
         }
 
-        await this.autotestService.openResultsPage(this.state.programDirectoryURI, taskID);
+        await this.autotestService.openResultsPage(this.state.programDirectoryURI, testID);
     }
 
     public async runTests(dirURI: string) {
@@ -249,7 +249,7 @@ export class AutotestViewWidget extends ReactWidget {
                 } else if (runInfo.status === AutotestRunStatus.NO_AUTOTESTS_DEFINED) {
                     message = "No autotests defined.";
                 } else if (runInfo.status === AutotestRunStatus.RUNNING) {
-                    message = "Allready running tests...";
+                    message = "Already running tests...";
                 } else if (runInfo.status === AutotestRunStatus.AUTOTEST_FILE_CORRUPT) {
                     message = "Autotests are corrupt. Please contact your supervisor!";
                 }
