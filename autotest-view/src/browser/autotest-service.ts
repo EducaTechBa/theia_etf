@@ -148,7 +148,7 @@ export class AutotestService {
 
     private readonly POLL_TIMEOUT_MS = 500;
     private readonly AUTOTEST_RESULTS_FILENAME = '.at_result';
-    private readonly AUTOTEST_FILENAME = '.autotest2';
+    private readonly AUTOTEST_FILENAMES = [ '.autotest', '.autotest2', '.autotest3' ];
 
     private state: AutotesterState = { programs: {} };
 
@@ -196,7 +196,7 @@ export class AutotestService {
         try {
             autotest = JSON.parse(autotestContent);
         } catch (err) {
-            console.log(`Corrupt '${this.AUTOTEST_FILENAME}' file in ${dirURI}`);
+            console.log(`Corrupt autotest file in ${dirURI}`);
             return {
                 success: false,
                 status: AutotestRunStatus.AUTOTEST_FILE_CORRUPT
@@ -422,12 +422,17 @@ export class AutotestService {
     }
 
     private async loadAutotestFile(dirURI: string): Promise<string | undefined> {
-        try {
-            const autotestURI = `${dirURI}/${this.AUTOTEST_FILENAME}`;
-            const autotestFile = await this.fileService.read(new URI(autotestURI));
-            const autotestContent = autotestFile.value;
-            return autotestContent;
-        } catch (_) {
+        for (let i=0; i<this.AUTOTEST_FILENAMES.length; i++) {
+            const fileName = this.AUTOTEST_FILENAMES[i];
+            try {
+                const autotestURI = `${dirURI}/${fileName}`;
+                const autotestFile = await this.fileService.read(new URI(autotestURI));
+                const autotestContent = autotestFile.value;
+                return autotestContent;
+            } catch (_) {
+            }
+        }
+        return undefined;
             return undefined;
         }
     }
@@ -441,9 +446,14 @@ export class AutotestService {
     }
 
     public async hasAutotestsDefined(dirURI: string): Promise<boolean> {
-        const uri = `${dirURI}/${this.AUTOTEST_FILENAME}`;
-        const trimmed = await this.getPathInWorkspace(uri);
-        return await this.workspaceService.containsSome([trimmed]);
+        for (let i=0; i<this.AUTOTEST_FILENAMES.length; i++) {
+            const fileName = this.AUTOTEST_FILENAMES[i];
+            const uri = `${dirURI}/${fileName}`;
+            const trimmed = await this.getPathInWorkspace(uri);
+            const exists = await this.workspaceService.containsSome([trimmed]);
+            if (exists) return exists;
+        }
+        return false;
     }
 
     private getPathInWorkspace(uri: string): string {
