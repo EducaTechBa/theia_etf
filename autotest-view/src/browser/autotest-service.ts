@@ -250,6 +250,7 @@ export class AutotestService {
             };
         }
 
+        await this.writeAutotestResultsFile(dirURI, `{ "program_id": ${program.id}, "task_id": ${taskID}, "status": 1 }`);
         this.getResults(dirURI);
 
         return {
@@ -371,6 +372,8 @@ export class AutotestService {
         };
 
         program.result = result;
+        responseResult.program_id = program.id;
+        responseResult.task_id = program.taskID;
 
         // If the testing is not completed, getResults again...
         if (program.status === ProgramStatus.PROGRAM_AWAITING_TESTS) {
@@ -509,17 +512,28 @@ export class AutotestService {
             completedTests: 0,
             testResults
         };
+        
+        let programId = -1;
+        if (data.hasOwnProperty('program_id'))
+            programId = data.program_id;
+        let taskId = -1;
+        if (data.hasOwnProperty('task_id'))
+            taskId = data.task_id;
+        console.log("Calling getProgramFromAutotestResultFile programId " + programId + " taskId " + taskId);
 
         const program: Program = {
-            id: -1,
+            id: programId,
             totalTests: 0,
             uri: dirURI,
             status: this.integerToProgramStatus(data.status),
             result,
-            taskID: -1,
+            taskID: taskId,
             isUserInvoked: false,
             rawResults: '',
         };
+        
+        if (this.getProgram(dirURI) === undefined)
+            this.state.programs[dirURI] = program;
 
         return program;
     }
@@ -551,7 +565,7 @@ export class AutotestService {
 
     public isBeingTested(dirURI: string): boolean {
         const program = this.state.programs[dirURI];
-        return program !== undefined && program.result !== undefined;
+        return program !== undefined && program.result !== undefined && program.result.isBeingTested;
     }
 
     public async getResultsPage(dirURI: string, taskID: number): Promise<string | undefined> {
