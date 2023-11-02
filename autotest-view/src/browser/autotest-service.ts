@@ -373,8 +373,12 @@ export class AutotestService {
         program.result = result;
 
         // If the testing is not completed, getResults again...
-        if (program.status === ProgramStatus.PROGRAM_AWAITING_TESTS
-            || program.status === ProgramStatus.PROGRAM_CURRENTLY_TESTING) {
+        if (program.status === ProgramStatus.PROGRAM_AWAITING_TESTS) {
+            this.onTestsUpdateEmitter.fire({ program });
+            await this.delay(this.POLL_TIMEOUT_MS*10).then(() => this.getResults(dirURI));
+            return;
+        }
+        if (program.status === ProgramStatus.PROGRAM_CURRENTLY_TESTING) {
             this.onTestsUpdateEmitter.fire({ program });
             await this.writeAutotestResultsFile(dirURI, JSON.stringify(responseResult, null, 4));
             await this.delay(this.POLL_TIMEOUT_MS).then(() => this.getResults(dirURI));
@@ -382,7 +386,6 @@ export class AutotestService {
         }
 
         // TODO: Populate program.taskResults
-
         await this.writeAutotestResultsFile(dirURI, JSON.stringify(responseResult, null, 4));
         this.clearProgramResults(dirURI);
 
