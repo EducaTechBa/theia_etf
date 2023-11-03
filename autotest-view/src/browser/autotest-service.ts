@@ -532,7 +532,7 @@ export class AutotestService {
             rawResults: '',
         };
         
-        if (this.getProgram(dirURI) === undefined)
+        if (this.getProgram(dirURI) === undefined && programId != -1 && taskId != -1)
             this.state.programs[dirURI] = program;
 
         return program;
