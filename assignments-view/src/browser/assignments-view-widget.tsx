@@ -15,9 +15,7 @@ import { AssignmentsDataProvider } from './assignments-data-provider';
 import { AssignmentGenerator } from './assignments-generator';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
 import URI from '@theia/core/lib/common/uri';
-import { FileService } from '@theia/filesystem/lib/browser/file-service';
 import { RetriableOperation } from './retriable-operation';
-import { FileOperationError, FileOperationResult } from '@theia/filesystem/lib/common/files';
 
 @injectable()
 export class AssignmentsViewWidget extends TreeWidget {
@@ -32,7 +30,6 @@ export class AssignmentsViewWidget extends TreeWidget {
         @inject(ContextMenuRenderer) contextMenuRenderer: ContextMenuRenderer,
         @inject(MessageService) private readonly messageService: MessageService,
         @inject(WorkspaceService) private readonly workspaceService: WorkspaceService,
-        @inject(FileService) private readonly fileService: FileService,
         @inject(OpenerService) private readonly openerService: OpenerService,
         @inject(AssignmentGenerator) private readonly assignmentGenerator: AssignmentGenerator,
     ) {
@@ -49,7 +46,7 @@ export class AssignmentsViewWidget extends TreeWidget {
         dataProvider
             .getCoursesData()
             .then((directories: Directory[]) => {
-                if (directories === []) {
+                if (directories.length === 0) {
                     this.messageService.info('No active courses found. If you think that this is an issue, contact your supervisor.');
                 }
 
@@ -94,8 +91,7 @@ export class AssignmentsViewWidget extends TreeWidget {
     private async assignmentDirectoryGeneration(assignment: Assignment) {
         console.log('Starting assignment generation method...')
         const workspaceURI = this.workspaceService.workspace?.resource || '';
-        const assignmentDirectoryPath = `${workspaceURI}/${assignment.path}`;
-        const assignmentDirectoryURI = new URI(assignmentDirectoryPath);
+        const assignmentDirectoryURI = `${workspaceURI}/${assignment.path}`;
         console.log('Done preparing directory uri based on assignemnt')
 
         this.messageService.info(`Generating sources for '${assignment.path}'...`);
@@ -103,7 +99,7 @@ export class AssignmentsViewWidget extends TreeWidget {
             await this.assignmentGenerator.generateAssignmentSources(assignmentDirectoryURI, assignment)
         } catch(err) {
             console.log(`Error generating assignment sources: ${err}`);
-         }
+        }
         this.messageService.info(`Sources for ${assignment.path} generated successfully!`);
         
         console.log(JSON.stringify(assignment))
@@ -112,7 +108,7 @@ export class AssignmentsViewWidget extends TreeWidget {
             .filter(file => file.show)
             .forEach(async file => {
                 try {
-                    const fileURI = new URI(`${assignmentDirectoryPath}/${file.filename}`);
+                    const fileURI = new URI(`${assignmentDirectoryURI}/${file.filename}`);
                     const operation = () => open(this.openerService, fileURI);
                     const retriable = new RetriableOperation(operation, this.RETRY_TIMEOUT_MS);
                     await retriable.run()
@@ -121,16 +117,6 @@ export class AssignmentsViewWidget extends TreeWidget {
                 }
             });
         console.log('End assignment generation and opening...')
-    }
-
-    private async generateAssignmentSources(assignmentDirectoryPath: string, assignment: Assignment) {
-        this.messageService.info(`Generating sources for '${assignment.path}'...`);
-        try {
-            await this.assignmentGenerator.generateAssignmentSources(assignmentDirectoryPath, assignment)
-        } catch(err) {
-            console.log(`Error generating assignment sources: ${err}`);
-        }
-        this.messageService.info(`Sources for ${assignment.path} generated successfully!`);
     }
 
     protected isExpandable(node: TreeNode): node is ExpandableTreeNode {
