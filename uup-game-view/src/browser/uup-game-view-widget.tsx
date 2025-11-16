@@ -9,7 +9,6 @@ import { Assignment, PowerupType, StudentData, GameServiceV11, ChallengeConfig, 
 import { ConfirmDialog, open, OpenerService } from '@theia/core/lib/browser';
 import { SelectDialog } from './select-dialogue';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
-import URI from '@theia/core/lib/common/uri';
 // @ts-ignore
 import { AutotestService, AutotestEvent } from 'autotest-view/lib/browser/autotest-service';
 // import { AutotestViewWidget } from 'autotest-view/lib/browser/autotest-view-widget';
@@ -222,10 +221,10 @@ export class UupGameViewWidget extends ReactWidget {
     }
 
     private createChangeEventListener(path : string) {
-        let uri = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME/${path}`);
-        //let taskSpecificationURI = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME/${assignment.name}/task.html`);
-        //let _taskSpecificationURI = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME/${assignment.name}/task.jpg`);
-        //let taskSolutionFileURI = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME/${assignment.name}/main.c`);
+        const workspaceRoot = this.workspaceService.workspace?.resource;
+        if (!workspaceRoot) return;
+
+        const uri = workspaceRoot.resolve(`UUP_GAME/${path}`);
         this.fileService.onDidFilesChange( async (e) => {
 
             if(e.contains(uri, FileChangeType.UPDATED)) {
@@ -247,7 +246,10 @@ export class UupGameViewWidget extends ReactWidget {
     }
 
     private async closeAllEditorsInFolder(path: string) {
-        let uri = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME/${path}`);
+        const workspaceRoot = this.workspaceService.workspace?.resource;
+        if (!workspaceRoot) return;
+
+        const uri = workspaceRoot.resolve(`UUP_GAME/${path}`);
         let resolve = await this.fileService.resolve(uri);
         if(resolve.children?.length) {
             for(const file of resolve.children) {
@@ -352,11 +354,16 @@ export class UupGameViewWidget extends ReactWidget {
             return;
 
         const directoryExists = await this.workspaceService.containsSome([`UUP_GAME/${assignment.path}`]);
-        const workspaceURI = this.workspaceService.workspace?.resource || '';
-        const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME/${assignment.path}`;
+        const workspaceRoot = this.workspaceService.workspace?.resource;
+        if (!workspaceRoot) {
+            this.messageService.error('No workspace is open');
+            return;
+        }
+
+        const assignmentDirectoryURI = workspaceRoot.resolve(`UUP_GAME/${assignment.path}`);
         //Create directory if it does not exist
         if (!directoryExists) {
-            await this.fileService.createFolder(new URI(assignmentDirectoryURI));
+            await this.fileService.createFolder(assignmentDirectoryURI);
             if(!this.state.fileWatchers[assignment.name]) {
                 this.state.fileWatchers[assignment.name] = true;
                 this.createChangeEventListener(assignment.path);
@@ -557,11 +564,13 @@ export class UupGameViewWidget extends ReactWidget {
 
     private async generateAssignmentFiles(assignment: AssignmentDetails) {
         const directoryExists = await this.workspaceService.containsSome([`UUP_GAME/${assignment.path}`]);
-        const workspaceURI = this.workspaceService.workspace?.resource || '';
-        const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME/${assignment.path}`;
+        const workspaceRoot = this.workspaceService.workspace?.resource;
+        if (!workspaceRoot) return;
+
+        const assignmentDirectoryURI = workspaceRoot.resolve(`UUP_GAME/${assignment.path}`);
 
         if (!directoryExists) {
-            await this.fileService.createFolder(new URI(assignmentDirectoryURI));
+            await this.fileService.createFolder(assignmentDirectoryURI);
             if(!this.state.fileWatchers[assignment.name]) {
                 this.state.fileWatchers[assignment.name] = true;
                 this.createChangeEventListener(assignment.path);
@@ -571,11 +580,13 @@ export class UupGameViewWidget extends ReactWidget {
 
     private async removeAssignmentFiles(assignment: AssignmentDetails) {
         const directoryExists = await this.workspaceService.containsSome([`UUP_GAME/${assignment.path}`]);
-        const workspaceURI = this.workspaceService.workspace?.resource || '';
-        const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME/${assignment.path}`;
+        const workspaceRoot = this.workspaceService.workspace?.resource;
+        if (!workspaceRoot) return;
+
+        const assignmentDirectoryURI = workspaceRoot.resolve(`UUP_GAME/${assignment.path}`);
 
         if (directoryExists) {
-            await this.fileService.delete(new URI(assignmentDirectoryURI), { recursive:true });
+            await this.fileService.delete(assignmentDirectoryURI, { recursive:true });
             this.state.fileWatchers[assignment.name] = false;
         }
     }
@@ -621,22 +632,55 @@ export class UupGameViewWidget extends ReactWidget {
             return;
         }
         
-        let uri = new URI(this.workspaceService.workspace?.resource+`/UUP_GAME/${path}`);
-        let resolve = await this.fileService.resolve(uri);
+        await this.openFilesHelper(path);
+    }
+
+        
+    private async openFilesHelper(path: string) {
+
+        // Properly construct URI using workspace root
+        const workspaceRoot = this.workspaceService.workspace?.resource;
+        if (!workspaceRoot) {
+            this.messageService.error('No workspace is open');
+            return;
+        }
+
+        // Use URI.resolve() to properly join paths
+        const uri = workspaceRoot.resolve(`UUP_GAME/${path}`);
+
+        let resolve;
+        try {
+            resolve = await this.fileService.resolve(uri);
+        } catch (err) {
+            this.messageService.error(`Failed to open directory: ${err}`);
+            return;
+        }
+
         // TODO use assignment files
         if(resolve.children?.length) {
             for(const file of resolve.children) {
-                if(file.isDirectory || file.name[0]==='.')
+                if(file.name[0]==='.')
                     continue;
-                else if(file.name.match(/.+\.c$/))
-                    await open(this.openerService, file.resource);
+                else if(file.isDirectory)
+                    await this.openFilesHelper(path + "/" + file.name);
+                else if(file.name.match(/.+\.c$/)) {
+                    try {
+                        await open(this.openerService, file.resource);
+                    } catch (err) {
+                        this.messageService.error(`Failed to open ${file.name}: ${err}`);
+                    }
+                }
                 else if(file.name.match(/.+\.html$/)) {
-                    await this.miniBrowserOpenHandler.open(file.resource, {
-                        mode: 'reveal',
-                        //widgetOptions: { mode: 'open-to-right' }
-                    });
+                    try {
+                        await this.miniBrowserOpenHandler.open(file.resource);
+                    } catch (err) {
+                        this.messageService.error(`Failed to open ${file.name}: ${err}`);
+                    }
                 }
             }
+        } else {
+            console.warn('openFiles: No children found in directory');
+            this.messageService.warn('No files found in assignment directory');
         }
 
     }
@@ -644,9 +688,14 @@ export class UupGameViewWidget extends ReactWidget {
     //TODO:
     // zatvoriti i otvoriti fajlove
     private async turnInCurrentTask(assignment: AssignmentDetails) {
-        const workspaceURI = this.workspaceService.workspace?.resource || '';
-        const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME/${assignment.path}`;
-        //const assignmentDirectoryURI = `${workspaceURI}/UUP_GAME`;
+        const workspaceRoot = this.workspaceService.workspace?.resource;
+        if (!workspaceRoot) {
+            this.messageService.error('No workspace is open');
+            return;
+        }
+
+        // Properly construct URI and convert to string for autotestService
+        const assignmentDirectoryURI = workspaceRoot.resolve(`UUP_GAME/${assignment.path}`).toString();
 
         const dialog = new ConfirmDialog({
             title: "Task turn in confirmation",
