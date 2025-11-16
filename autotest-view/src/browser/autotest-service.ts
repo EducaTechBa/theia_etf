@@ -173,9 +173,8 @@ export class AutotestService {
         @inject(WorkspaceService) private readonly workspaceService: WorkspaceService,
         @inject(SessionManager) private readonly sessionManager: SessionManager,
     ) {
-        this.onTestsCanceled.maxListeners = 0;
-        this.onTestsFinished.maxListeners = 0;
-        this.onTestsUpdate.maxListeners = 0;
+        // maxListeners is not needed in Theia's event system (Emitter/Event pattern)
+        // The Emitter handles multiple listeners automatically without configuration
     }
 
     public async runTests(dirURI: string, isUserInvoked: boolean): Promise<AutotestRunInfo> {

@@ -13,7 +13,7 @@
         "**/.DS_Store": true,
         "**/.*": true
     },
-    
+
     "C_Cpp.intelliSenseEngine": "Disabled",
     "C_Cpp.autocomplete": "Disabled",
     "C_Cpp.errorSquiggles": "Disabled",

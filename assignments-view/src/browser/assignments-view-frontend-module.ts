@@ -25,15 +25,15 @@ export default new ContainerModule(bind => {
     })).inSingletonScope();
 });
 
-export function createAssignmentViewWidget(parent: interfaces.Container) : AssignmentsViewWidget {
+export async function createAssignmentViewWidget(parent: interfaces.Container) : Promise<AssignmentsViewWidget> {
     const child = createTreeContainer(parent);
-  
+
     child.unbind(TreeImpl);
     child.bind(AssignmentsTree).toSelf();
     child.rebind(Tree).toService(AssignmentsTree);
-  
+
     child.unbind(TreeWidget);
     child.bind(AssignmentsViewWidget).toSelf();
-  
-    return child.get(AssignmentsViewWidget);   
+
+    return child.getAsync(AssignmentsViewWidget);
 }

@@ -11,15 +11,16 @@
     "src"
   ],
   "dependencies": {
-    "@theia/core": "1.6.0",
-    "@theia/workspace": "1.6.0",
-    "@theia/filesystem": "1.6.0",
-    "@theia/task": "1.6.0",
-    "@theia/terminal": "1.6.0",
-    "@theia/debug": "1.6.0",
-    "@theia/editor": "1.6.0"
+    "@theia/core": "1.66.2",
+    "@theia/workspace": "1.66.2",
+    "@theia/filesystem": "1.66.2",
+    "@theia/task": "1.66.2",
+    "@theia/terminal": "1.66.2",
+    "@theia/debug": "1.66.2",
+    "@theia/editor": "1.66.2"
   },
   "devDependencies": {
+    "@types/glob": "^8.1.0",
     "rimraf": "latest",
     "typescript": "latest"
   },

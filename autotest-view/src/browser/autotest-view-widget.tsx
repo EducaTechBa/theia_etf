@@ -3,7 +3,7 @@ import { injectable, postConstruct, inject } from 'inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core';
 import { EditorManager, EditorWidget } from '@theia/editor/lib/browser';
-import { FileSystem } from '@theia/filesystem/lib/common';
+import { FileService } from '@theia/filesystem/lib/browser/file-service';
 import { AutotestService, AutotestRunStatus, Program, TestResult, AutotestCancelStatus } from './autotest-service';
 
 interface AutotestWidgetState {
@@ -34,8 +34,8 @@ export class AutotestViewWidget extends ReactWidget {
     @inject(EditorManager)
     protected readonly editorManager!: EditorManager;
 
-    @inject(FileSystem)
-    protected readonly fileSystem!: FileSystem;
+    @inject(FileService)
+    protected readonly fileService!: FileService;
 
     @inject(AutotestService)
     protected readonly autotestService!: AutotestService;

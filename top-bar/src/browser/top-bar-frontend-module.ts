@@ -17,6 +17,6 @@ export default new ContainerModule(bind => {
     bind(SessionManager).toSelf().inSingletonScope();
     bind(WidgetFactory).toDynamicValue(ctx => ({
         id: TopBarWidget.ID,
-        createWidget: () => ctx.container.get<TopBarWidget>(TopBarWidget)
+        createWidget: () => ctx.container.getAsync<TopBarWidget>(TopBarWidget)
     })).inSingletonScope();
 });

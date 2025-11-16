@@ -10,5 +10,8 @@
   },
   "workspaces": [
     "uup-game-view", "top-bar", "autotest-view", "assignments-view", "app"
-  ]
+  ],
+  "resolutions": {
+    "node-gyp": "^10.0.1"
+  }
 }

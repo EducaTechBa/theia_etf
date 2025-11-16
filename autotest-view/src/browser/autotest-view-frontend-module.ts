@@ -15,6 +15,6 @@ export default new ContainerModule(bind => {
     bind(AutotestService).toSelf().inSingletonScope();
     bind(WidgetFactory).toDynamicValue(ctx => ({
         id: AutotestViewWidget.ID,
-        createWidget: () => ctx.container.get<AutotestViewWidget>(AutotestViewWidget)
+        createWidget: () => ctx.container.getAsync<AutotestViewWidget>(AutotestViewWidget)
     })).inSingletonScope();
 });

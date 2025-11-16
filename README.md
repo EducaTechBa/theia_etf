@@ -51,18 +51,23 @@ For ease of use, to create a new extension, run the following script at the root
 ```
 You will be prompted to give the name of the extension, to choose a template, to give the author name, licence and description. After that the extension should have been created. To include the extension in the application add the extension to **workspaces** in `./package.json` and to **dependencies** in `./app/package.json`.
 
-<!-- TODO: Improve this bit... -->
+Building extensions requires yeoman and a generator for theia extensions:
+```bash
+npm install -g yo generator-theia-extension
+```
 
-<!-- Your extension should have a name that you provided and the /your-extension/package.json file should have it stored. Like this:
 
-![](images/extension_package.png)
+## Building tips&tricks
 
-Use the name of your extension and the version where it needs to be provided. The /package.json file should look like this:
+Current chosen extension for debugging C & C++ programs (CodeLLDB by vadimcn) requires each user to download and install platform-specific binaries. To save on disk space, we preload a platform specific version of extension in app/package.json (currently linux/arm64). If you are building Theia on another architecture or OS, consult releases section on project github page (https://github.com/vadimcn/codelldb/releases) for correct URL to use in package.json.
 
-![](images/package.png)
-
-The /app/package.json file should look like this: 
-
-![](images/app_package.png)
-
-Version 0.0.0 can be found in the /your-extension/package.json file -->
+Currently github and open-vsx do not support IPv6, so if you're building on an IPv6-only host your build will fail. This can be fixed by adding a public IPv6 github proxy to your /etc/hosts, and by using a local vsix cache: just create a directory named "vsix-cache" and put all vsix files into it, then edit package.json like this:
+```bash
+npm install -g yo generator-theia-extension
+```
+  "theiaPlugins": {
+    "vscode-git": "file:///usr/local/webide/theia/vsix-cache/vscode.git-1.52.1.vsix",
+    "vscode-clangd": "file:///usr/local/webide/theia/vsix-cache/llvm-vs-code-extensions.vscode-clangd-0.3.2.vsix",
+    "vscode-lldb": "file:///usr/local/webide/theia/vsix-cache/codelldb-linux-arm64.vsix",
+    ...
+```

@@ -7,7 +7,7 @@ import { FrontendApplicationStateService } from '@theia/core/lib/browser/fronten
 import { WorkspaceService, WorkspaceCommands } from '@theia/workspace/lib/browser';
 import { FrontendApplication, FrontendApplicationContribution } from '@theia/core/lib/browser';
 import { MaybePromise } from '@theia/core/lib/common/types';
-import { TerminalMenus, TerminalCommands } from '@theia/terminal/lib/browser/terminal-frontend-contribution';
+import { TerminalCommands } from '@theia/terminal/lib/browser/terminal-frontend-contribution';
 import { DebugSessionManager } from '@theia/debug/lib/browser/debug-session-manager';
 import { TerminalService } from '@theia/terminal/lib/browser/base/terminal-service';
 
@@ -74,14 +74,14 @@ export class TopBarContribution extends AbstractViewContribution<TopBarWidget> i
     registerMenus(menus: MenuModelRegistry): void {
         super.registerMenus(menus);
 
-        menus.unregisterMenuNode(TerminalMenus.TERMINAL[1]);
+        // Unregister the terminal menu - the new API uses unregisterMenuAction
+        // Since we've already unregistered terminal commands, the associated menu items should also be removed
+        // If you need to explicitly remove a specific menu, use: menus.unregisterMenuAction(menuId)
     }
 
     onStart(app: FrontendApplication): MaybePromise<void> {
-        if (this.workspaceService.opened) {
-            this.stateService.reachedState('ready').then(
-                () => this.openView({ reveal: true })
-            );
-        }
+        this.stateService.reachedState('ready').then(
+            () => this.openView({ activate: false, reveal: true })
+        );
     }
 }

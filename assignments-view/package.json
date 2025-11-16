@@ -13,11 +13,12 @@
     "src"
   ],
   "dependencies": {
-    "@theia/core": "1.6.0",
-    "@theia/filesystem": "1.6.0",
-    "@theia/workspace": "1.6.0"
+    "@theia/core": "1.66.2",
+    "@theia/filesystem": "1.66.2",
+    "@theia/workspace": "1.66.2"
   },
   "devDependencies": {
+    "@types/glob": "^8.1.0",
     "rimraf": "latest",
     "typescript": "latest"
   },

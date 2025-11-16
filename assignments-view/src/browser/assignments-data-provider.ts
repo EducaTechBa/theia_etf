@@ -28,6 +28,7 @@ export class AssignmentsDataProvider {
             name: course.name,
             abbrev: course.abbrev,
             external: course.external,
+            str: course.str,
         }));
     }
 

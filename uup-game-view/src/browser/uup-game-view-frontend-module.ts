@@ -15,6 +15,6 @@ export default new ContainerModule(bind => {
     bind(GameServiceV11).toSelf().inSingletonScope();
     bind(WidgetFactory).toDynamicValue(ctx => ({
         id: UupGameViewWidget.ID,
-        createWidget: () => ctx.container.get<UupGameViewWidget>(UupGameViewWidget)
+        createWidget: () => ctx.container.getAsync<UupGameViewWidget>(UupGameViewWidget)
     })).inSingletonScope();
 });
