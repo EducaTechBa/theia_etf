@@ -51,14 +51,16 @@
     "target": "browser",
     "frontend": {
       "config": {
-        "applicationName": "EducaTech Theia"
+        "applicationName": "EducaTech Theia",
+        "warnOnPotentiallyInsecureHostPattern": false
       }
     },
     "backend": {
       "config": {
         "miniBrowserEndpoint": {
           "path": "/mini-browser"
-        }
+        },
+        "warnOnPotentiallyInsecureHostPattern": false
       }
     }
   },
