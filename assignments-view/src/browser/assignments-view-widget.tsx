@@ -14,15 +14,13 @@ import { MessageService } from '@theia/core';
 import { AssignmentsDataProvider } from './assignments-data-provider';
 import { AssignmentGenerator } from './assignments-generator';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
-import URI from '@theia/core/lib/common/uri';
-import { RetriableOperation } from './retriable-operation';
+import { MiniBrowserOpenHandler } from '@theia/mini-browser/lib/browser/mini-browser-open-handler';
+import { FileService } from '@theia/filesystem/lib/browser/file-service';
 
 @injectable()
 export class AssignmentsViewWidget extends TreeWidget {
     static readonly ID = 'assignments-view:widget';
     static readonly LABEL = 'Assignments View';
-
-    private readonly RETRY_TIMEOUT_MS = 1000;
 
     constructor(
         @inject(TreeProps) readonly props: TreeProps,
@@ -32,6 +30,8 @@ export class AssignmentsViewWidget extends TreeWidget {
         @inject(WorkspaceService) private readonly workspaceService: WorkspaceService,
         @inject(OpenerService) private readonly openerService: OpenerService,
         @inject(AssignmentGenerator) private readonly assignmentGenerator: AssignmentGenerator,
+        @inject(MiniBrowserOpenHandler) private readonly miniBrowserOpenHandler: MiniBrowserOpenHandler,
+        @inject(FileService) private readonly fileService: FileService,
     ) {
         super(props, model, contextMenuRenderer);
 
@@ -90,33 +90,74 @@ export class AssignmentsViewWidget extends TreeWidget {
 
     private async assignmentDirectoryGeneration(assignment: Assignment) {
         console.log('Starting assignment generation method...')
-        const workspaceURI = this.workspaceService.workspace?.resource || '';
-        const assignmentDirectoryURI = `${workspaceURI}/${assignment.path}`;
-        console.log('Done preparing directory uri based on assignemnt')
+
+        const workspaceRoot = this.workspaceService.workspace?.resource;
+        if (!workspaceRoot) {
+            this.messageService.error('No workspace is open');
+            return;
+        }
+
+        const assignmentDirectoryURI = workspaceRoot.resolve(assignment.path);
+        console.log('Done preparing directory uri based on assignment')
 
         this.messageService.info(`Generating sources for '${assignment.path}'...`);
         try {
-            await this.assignmentGenerator.generateAssignmentSources(assignmentDirectoryURI, assignment)
+            await this.assignmentGenerator.generateAssignmentSources(assignmentDirectoryURI.toString(), assignment)
         } catch(err) {
             console.log(`Error generating assignment sources: ${err}`);
+            this.messageService.error(`Failed to generate sources: ${err}`);
+            return;
         }
         this.messageService.info(`Sources for ${assignment.path} generated successfully!`);
-        
+
         console.log(JSON.stringify(assignment))
 
-        assignment.files
-            .filter(file => file.show)
-            .forEach(async file => {
-                try {
-                    const fileURI = new URI(`${assignmentDirectoryURI}/${file.filename}`);
-                    const operation = () => open(this.openerService, fileURI);
-                    const retriable = new RetriableOperation(operation, this.RETRY_TIMEOUT_MS);
-                    await retriable.run()
-                } catch(err) {
-                    console.log(`Error opening file: ${err}`)
-                }
-            });
+        // Open files recursively from the assignment directory
+        await this.openAssignmentFilesHelper(assignment.path);
         console.log('End assignment generation and opening...')
+    }
+
+    private async openAssignmentFilesHelper(path: string) {
+        const workspaceRoot = this.workspaceService.workspace?.resource;
+        if (!workspaceRoot) {
+            this.messageService.error('No workspace is open');
+            return;
+        }
+
+        const uri = workspaceRoot.resolve(path);
+
+        let resolve;
+        try {
+            resolve = await this.fileService.resolve(uri);
+        } catch (err) {
+            console.error(`Failed to resolve directory ${path}:`, err);
+            return;
+        }
+
+        if (resolve.children?.length) {
+            for (const file of resolve.children) {
+                if (file.name[0] === '.')
+                    continue;
+                else if (file.isDirectory)
+                    await this.openAssignmentFilesHelper(path + "/" + file.name);
+                else if (file.name.match(/.+\.html$/)) {
+                    try {
+                        await this.miniBrowserOpenHandler.open(file.resource);
+                    } catch (err) {
+                        console.error(`Failed to open HTML file ${file.name}:`, err);
+                        this.messageService.error(`Failed to open ${file.name}: ${err}`);
+                    }
+                } else {
+                    // Open all other files (C, C++, etc.) with the default editor
+                    try {
+                        await open(this.openerService, file.resource);
+                    } catch (err) {
+                        console.error(`Failed to open file ${file.name}:`, err);
+                        this.messageService.error(`Failed to open ${file.name}: ${err}`);
+                    }
+                }
+            }
+        }
     }
 
     protected isExpandable(node: TreeNode): node is ExpandableTreeNode {
