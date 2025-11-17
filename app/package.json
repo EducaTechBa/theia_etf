@@ -27,7 +27,6 @@
     "@theia/variable-resolver": "1.66.2",
     "@theia/vsx-registry": "1.66.2",
     "@theia/workspace": "1.66.2",
-    "ai-asistent": "0.0.0",
     "assignments-view": "0.0.0",
     "autotest-view": "0.0.0",
     "react-select": "^3.1.0",
