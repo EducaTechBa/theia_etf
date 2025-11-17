@@ -23,6 +23,7 @@ export class TopBarWidget extends ReactWidget {
 
     private editorFileURI: URI | undefined;
     private isHomeworkAssignment: boolean = false;
+    private isTaskRunning: boolean = false;
 
     @inject(MessageService)
     protected readonly messageService: MessageService;
@@ -46,6 +47,12 @@ export class TopBarWidget extends ReactWidget {
 
         this.editorManager.onCreated(editorWidget => this.handleEditorSwitch(editorWidget));
         this.editorManager.onActiveEditorChanged(editorWidget => this.handleEditorSwitch(editorWidget));
+
+        // Set up callback for task state changes
+        this.taskRunner.setOnTaskStateChangeCallback((isRunning: boolean) => {
+            this.isTaskRunning = isRunning;
+            this.update();
+        });
 
         this.update();
     }
@@ -86,18 +93,32 @@ export class TopBarWidget extends ReactWidget {
     }
 
     private renderRunButton(): React.ReactNode {
-        return this.renderButton({
-            text: 'Run',
-            tooltip: 'Run current program',
-            iconClass: 'fa fa-play',
-            onClick: () => this.handleRunButtonClick()
-        });
+        if (this.isTaskRunning) {
+            return this.renderButton({
+                text: 'Stop',
+                tooltip: 'Stop running program',
+                iconClass: 'fa fa-stop',
+                classNames: 'stop-button',
+                onClick: () => this.handleStopButtonClick()
+            });
+        } else {
+            return this.renderButton({
+                text: 'Run',
+                tooltip: 'Run current program',
+                iconClass: 'fa fa-play',
+                onClick: () => this.handleRunButtonClick()
+            });
+        }
     }
 
     private async handleRunButtonClick() {
         if (this.editorFileURI) {
             this.taskRunner.runTask(this.editorFileURI);
         }
+    }
+
+    private async handleStopButtonClick() {
+        await this.taskRunner.stopTask();
     }
 
     private renderSubmitButton(): React.ReactNode {

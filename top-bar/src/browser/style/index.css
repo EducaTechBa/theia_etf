@@ -15,3 +15,17 @@
 .not-homework {
     display: none;
 }
+
+.stop-button {
+    background-color: var(--theia-error-color0, #d32f2f) !important;
+    color: white !important;
+}
+
+.stop-button:hover {
+    background-color: var(--theia-error-color1, #c62828) !important;
+}
+
+.stop-button .button-icon {
+    color: white;
+}
+
