@@ -29,3 +29,10 @@
     color: white;
 }
 
+/* Hide Testing view from activity bar */
+.p-TabBar-tab[data-id*="testing"],
+.p-TabBar-tab[data-id*="workbench.view.testing"],
+.theia-app-sides .p-TabBar-tab[title="Testing"],
+#shell-tab-test-view-container {
+    display: none !important;
+}
