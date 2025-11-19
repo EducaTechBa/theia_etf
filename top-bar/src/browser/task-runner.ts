@@ -14,6 +14,7 @@ import URI from '@theia/core/lib/common/uri';
 import { DisposableCollection } from '@theia/core/lib/common/disposable';
 import { MessageService } from '@theia/core';
 import { FileChangeType } from '@theia/filesystem/lib/common/files';
+import { TerminalService } from '@theia/terminal/lib/browser/base/terminal-service';
 
 interface TaskCommands {
     build?: string;
@@ -37,6 +38,7 @@ export class TaskRunner {
     private currentFileURI: URI | undefined;
     private onTaskStateChangeCallback: ((isRunning: boolean) => void) | undefined;
     private asanWatcherDisposables: DisposableCollection = new DisposableCollection();
+    private currentTaskTerminalId: number | undefined;
 
     @inject(TaskService)
     protected readonly taskService: TaskService;
@@ -53,6 +55,9 @@ export class TaskRunner {
     @inject(MessageService)
     protected readonly messageService: MessageService;
 
+    @inject(TerminalService)
+    protected readonly terminalService: TerminalService;
+
     @postConstruct()
     // @ts-ignore
     private async init() {
@@ -61,12 +66,18 @@ export class TaskRunner {
         this.directoryTasks = await this.loadDirectoryTaskConfigFromJson(jsonURI);
 
         // Subscribe to task events
-        // Use onTaskCreated instead of onDidStartTaskProcess as it's more reliable
+        // Note: We also call handleTaskStarted directly in runTask() for immediate response
+        // This event handler catches tasks that might be started elsewhere
         this.taskWatcher.onTaskCreated(taskInfo => {
-            this.handleTaskStarted(taskInfo);
+            console.log("onTaskCreated event fired:", taskInfo);
+            // Only handle if we don't already have this task tracked
+            if (!this.currentRunningTask || this.currentRunningTask.taskId !== taskInfo.taskId) {
+                this.handleTaskStarted(taskInfo);
+            }
         });
 
         this.taskWatcher.onDidEndTaskProcess(taskEvent => {
+            console.log("onDidEndTaskProcess event fired:", taskEvent);
             this.handleTaskEnded(taskEvent.taskId);
         });
     }
@@ -155,9 +166,20 @@ export class TaskRunner {
         const taskInfo = await this.taskService.runTask(runTask);
 
         // Call handleTaskStarted directly since events might have already fired
-        if (taskInfo) {
-            console.log("runTask returned taskInfo:", taskInfo);
+        // But only if we got a valid taskInfo with a valid taskId
+        if (taskInfo && taskInfo.taskId > 0) {
+            console.log("runTask returned valid taskInfo:", taskInfo);
             this.handleTaskStarted(taskInfo);
+
+            // Check after a short delay if the task is still running
+            // This handles the case where task exits immediately (e.g., script doesn't exist)
+            setTimeout(async () => {
+                await this.verifyTaskStillRunning(taskInfo.taskId);
+            }, 500);
+        } else {
+            console.log("runTask returned invalid taskInfo or task failed to start:", taskInfo);
+            // Task failed to start properly, ensure we're in stopped state
+            this.resetTaskState();
         }
     }
 
@@ -169,7 +191,14 @@ export class TaskRunner {
                 this.disposeAsanWatcher();
             } catch (err) {
                 console.error('Error stopping task:', err);
+                // Task might have already ended, reset state to recover
+                this.resetTaskState();
             }
+        } else {
+            // If we're in a stuck state where button thinks task is running
+            // but currentRunningTask is undefined, force a reset
+            console.log('stopTask called but no currentRunningTask, forcing reset');
+            this.resetTaskState();
         }
     }
 
@@ -183,8 +212,15 @@ export class TaskRunner {
 
     private handleTaskStarted(taskInfo: TaskInfo) {
         // Only track tasks that we started (not background tasks from dependencies)
-        if (taskInfo && !taskInfo.config.isBackground) {
+        if (taskInfo && taskInfo.taskId > 0 && !taskInfo.config.isBackground) {
+            console.log(`handleTaskStarted: taskId=${taskInfo.taskId}, label=${taskInfo.config.label}, terminalId=${taskInfo.terminalId}`);
             this.currentRunningTask = taskInfo;
+
+            // Track the terminal ID so we can close it later
+            if (taskInfo.terminalId) {
+                this.currentTaskTerminalId = taskInfo.terminalId;
+                console.log(`Tracking terminal ID: ${this.currentTaskTerminalId}`);
+            }
 
             // Set up ASAN file watcher
             this.setupAsanWatcher();
@@ -192,20 +228,19 @@ export class TaskRunner {
             if (this.onTaskStateChangeCallback) {
                 this.onTaskStateChangeCallback(true);
             }
+        } else {
+            console.log(`handleTaskStarted: ignoring task (background or invalid):`, taskInfo);
         }
     }
 
     private handleTaskEnded(taskId: number) {
+        console.log(`handleTaskEnded: taskId=${taskId}, currentRunningTaskId=${this.currentRunningTask?.taskId}`);
         // Check if the ended task is our current running task
         if (this.currentRunningTask && this.currentRunningTask.taskId === taskId) {
-            this.currentRunningTask = undefined;
-
-            // Clean up ASAN file watcher
-            this.disposeAsanWatcher();
-
-            if (this.onTaskStateChangeCallback) {
-                this.onTaskStateChangeCallback(false);
-            }
+            console.log('Task ended, resetting state');
+            this.resetTaskState();
+        } else {
+            console.log('Task ended but it was not our tracked task, ignoring');
         }
     }
 
@@ -249,6 +284,55 @@ export class TaskRunner {
     private disposeAsanWatcher() {
         this.asanWatcherDisposables.dispose();
         this.asanWatcherDisposables = new DisposableCollection();
+    }
+
+    private async verifyTaskStillRunning(taskId: number) {
+        try {
+            const runningTasks = await this.taskService.getRunningTasks();
+            const isStillRunning = runningTasks.some(task => task.taskId === taskId);
+
+            console.log(`verifyTaskStillRunning: taskId=${taskId}, isStillRunning=${isStillRunning}, runningTasks=${runningTasks.length}`);
+
+            if (!isStillRunning && this.currentRunningTask && this.currentRunningTask.taskId === taskId) {
+                console.log('Task ended immediately after starting, resetting state');
+                this.resetTaskState();
+            }
+        } catch (err) {
+            console.error('Error verifying task status:', err);
+            // If we can't verify, assume it's not running and reset
+            this.resetTaskState();
+        }
+    }
+
+    private resetTaskState() {
+        console.log('Resetting task state to stopped');
+
+        // Close the terminal associated with this task
+        if (this.currentTaskTerminalId !== undefined) {
+            console.log(`Closing terminal ID: ${this.currentTaskTerminalId}`);
+            this.closeTerminal(this.currentTaskTerminalId);
+            this.currentTaskTerminalId = undefined;
+        }
+
+        this.currentRunningTask = undefined;
+        this.disposeAsanWatcher();
+        if (this.onTaskStateChangeCallback) {
+            this.onTaskStateChangeCallback(false);
+        }
+    }
+
+    private closeTerminal(terminalId: number) {
+        try {
+            const terminal = this.terminalService.getById(terminalId.toString());
+            if (terminal) {
+                console.log(`Closing terminal: ${terminal.title.label}`);
+                terminal.dispose();
+            } else {
+                console.log(`Terminal with ID ${terminalId} not found`);
+            }
+        } catch (err) {
+            console.error(`Error closing terminal ${terminalId}:`, err);
+        }
     }
 
 }

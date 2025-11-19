@@ -6,6 +6,7 @@ import { EditorManager, EditorWidget } from '@theia/editor/lib/browser';
 import URI from '@theia/core/lib/common/uri';
 import { HomeworkSubmit } from './homework-submit';
 import { TaskRunner } from './task-runner';
+import { TerminalService } from '@theia/terminal/lib/browser/base/terminal-service';
 
 interface TopBarButtonProps {
     text: string;
@@ -36,6 +37,9 @@ export class TopBarWidget extends ReactWidget {
 
     @inject(TaskRunner)
     protected readonly taskRunner: TaskRunner;
+
+    @inject(TerminalService)
+    protected readonly terminalService: TerminalService;
 
     @postConstruct()
     protected async init(): Promise<void> {
@@ -149,9 +153,31 @@ export class TopBarWidget extends ReactWidget {
     }
 
     private async handleLogoutButtonClick() {
+        // Close all terminals before logout to prevent accumulation
+        console.log('Closing all terminals before logout...');
+        this.closeAllTerminals();
+
         await fetch('/api/v1/stop');
         await fetch('/api/v1/logout');
         window.location.href = '/';
+    }
+
+    private closeAllTerminals() {
+        try {
+            const allTerminals = this.terminalService.all;
+            console.log(`Closing ${allTerminals.length} terminals...`);
+
+            allTerminals.forEach(terminal => {
+                try {
+                    console.log(`Closing terminal: ${terminal.title.label}`);
+                    terminal.dispose();
+                } catch (err) {
+                    console.error(`Error closing terminal ${terminal.title.label}:`, err);
+                }
+            });
+        } catch (err) {
+            console.error('Error closing terminals:', err);
+        }
     }
 
 }

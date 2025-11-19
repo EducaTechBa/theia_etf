@@ -7,6 +7,7 @@ import '../../src/browser/style/index.css';
 import { HomeworkSubmit } from './homework-submit';
 import { TaskRunner } from './task-runner';
 import { SessionManager } from './session-manager';
+import { TerminalLayoutCleaner } from './terminal-layout-cleaner';
 
 export default new ContainerModule(bind => {
     bindViewContribution(bind, TopBarContribution);
@@ -19,4 +20,8 @@ export default new ContainerModule(bind => {
         id: TopBarWidget.ID,
         createWidget: () => ctx.container.getAsync<TopBarWidget>(TopBarWidget)
     })).inSingletonScope();
+
+    // Register terminal layout cleaner as a FrontendApplicationContribution
+    // This ensures it runs early in the lifecycle, before layout restoration
+    bind(FrontendApplicationContribution).to(TerminalLayoutCleaner).inSingletonScope();
 });
