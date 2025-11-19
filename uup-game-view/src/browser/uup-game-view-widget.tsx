@@ -353,20 +353,21 @@ export class UupGameViewWidget extends ReactWidget {
         if(!confirmation)
             return;
 
-        const directoryExists = await this.workspaceService.containsSome([`UUP_GAME/${assignment.path}`]);
+        const path = assignment.path + "/Z" + assignment.currentTask.taskNumber;
+        const directoryExists = await this.workspaceService.containsSome([`UUP_GAME/${path}`]);
         const workspaceRoot = this.workspaceService.workspace?.resource;
         if (!workspaceRoot) {
             this.messageService.error('No workspace is open');
             return;
         }
 
-        const assignmentDirectoryURI = workspaceRoot.resolve(`UUP_GAME/${assignment.path}`);
+        const assignmentDirectoryURI = workspaceRoot.resolve(`UUP_GAME/${path}`);
         //Create directory if it does not exist
         if (!directoryExists) {
             await this.fileService.createFolder(assignmentDirectoryURI);
             if(!this.state.fileWatchers[assignment.name]) {
                 this.state.fileWatchers[assignment.name] = true;
-                this.createChangeEventListener(assignment.path);
+                this.createChangeEventListener(path);
             }
         }  
         //Call service to start asssignment and get a response
@@ -563,27 +564,29 @@ export class UupGameViewWidget extends ReactWidget {
     }
 
     private async generateAssignmentFiles(assignment: AssignmentDetails) {
-        const directoryExists = await this.workspaceService.containsSome([`UUP_GAME/${assignment.path}`]);
+        const path = assignment.path + "/Z" + assignment.currentTask.taskNumber;
+        const directoryExists = await this.workspaceService.containsSome([`UUP_GAME/${path}`]);
         const workspaceRoot = this.workspaceService.workspace?.resource;
         if (!workspaceRoot) return;
 
-        const assignmentDirectoryURI = workspaceRoot.resolve(`UUP_GAME/${assignment.path}`);
+        const assignmentDirectoryURI = workspaceRoot.resolve(`UUP_GAME/${path}`);
 
         if (!directoryExists) {
             await this.fileService.createFolder(assignmentDirectoryURI);
             if(!this.state.fileWatchers[assignment.name]) {
                 this.state.fileWatchers[assignment.name] = true;
-                this.createChangeEventListener(assignment.path);
+                this.createChangeEventListener(path);
             } 
         }
     }
 
     private async removeAssignmentFiles(assignment: AssignmentDetails) {
-        const directoryExists = await this.workspaceService.containsSome([`UUP_GAME/${assignment.path}`]);
+        const path = assignment.path + "/Z" + assignment.currentTask.taskNumber;
+        const directoryExists = await this.workspaceService.containsSome([`UUP_GAME/${path}`]);
         const workspaceRoot = this.workspaceService.workspace?.resource;
         if (!workspaceRoot) return;
 
-        const assignmentDirectoryURI = workspaceRoot.resolve(`UUP_GAME/${assignment.path}`);
+        const assignmentDirectoryURI = workspaceRoot.resolve(`UUP_GAME/${path}`);
 
         if (directoryExists) {
             await this.fileService.delete(assignmentDirectoryURI, { recursive:true });
@@ -609,7 +612,7 @@ export class UupGameViewWidget extends ReactWidget {
 
     private async openFiles(assignment: AssignmentDetails) {
         if (assignment.finished) return;
-        let path = assignment.path;
+        const path = assignment.path + "/Z" + assignment.currentTask.taskNumber;
 
         const directoryExists = await this.workspaceService.containsSome([`UUP_GAME/${path}`]);
         if (!directoryExists) {
@@ -679,7 +682,7 @@ export class UupGameViewWidget extends ReactWidget {
                 }
             }
         } else {
-            console.warn('openFiles: No children found in directory');
+            console.warn('openFiles: No children found in directory UUP_GAME/' + path);
             this.messageService.warn('No files found in assignment directory');
         }
 
@@ -695,7 +698,8 @@ export class UupGameViewWidget extends ReactWidget {
         }
 
         // Properly construct URI and convert to string for autotestService
-        const assignmentDirectoryURI = workspaceRoot.resolve(`UUP_GAME/${assignment.path}`).toString();
+        const path = assignment.path + "/Z" + assignment.currentTask.taskNumber;
+        const assignmentDirectoryURI = workspaceRoot.resolve(`UUP_GAME/${path}`).toString();
 
         const dialog = new ConfirmDialog({
             title: "Task turn in confirmation",
@@ -714,6 +718,7 @@ export class UupGameViewWidget extends ReactWidget {
             // Start testing
             try {
                 this.messageService.info(`Starting unit testing on task '${assignment.currentTask.name}'.`);
+                console.log("Running tests in uri UUP_GAME/" + path);
                 const testStatus = await this.autotestService.runTests(assignmentDirectoryURI, false);
                 if(!testStatus.success) {
                     this.messageService.error("Could not run tests, check if tests are already running and all files are there.");
@@ -774,7 +779,7 @@ export class UupGameViewWidget extends ReactWidget {
                         });
                         return;
                     }
-                    await this.closeAllEditorsInFolder(assignment.path);
+                    await this.closeAllEditorsInFolder(path);
                     const response = await this.gameServiceV11.turnInTask(assignment);
                     if(response.success) {
                         this.messageService.info(response.message);
