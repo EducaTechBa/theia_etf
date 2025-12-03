@@ -19,7 +19,17 @@
     "C_Cpp.errorSquiggles": "Disabled",
 
     "clangd.path": "/usr/bin/clangd",
-    "clangd.arguments": ["-log=verbose", "-pretty", "--background-index"],
+    "clangd.arguments": [
+        // Multi-user optimization: Reduce CPU and memory usage
+        "-j=1",                           // Limit to 1 thread (default is #CPUs)
+        "--background-index=false",       // Disable background indexing to save CPU
+        "--limit-results=50",             // Limit completion results
+        "--completion-style=bundled",     // Reduce completion overhead
+        "--header-insertion=never",       // Disable auto header insertion
+        "--pch-storage=memory",           // Store precompiled headers in memory (faster but more RAM)
+        "--clang-tidy=false",             // Disable clang-tidy checks
+        "--log=error"                     // Only log errors (not verbose)
+    ],
 
     "testing.automaticallyOpenPeekView": "never",
     "testing.openTesting": "neverOpen"
