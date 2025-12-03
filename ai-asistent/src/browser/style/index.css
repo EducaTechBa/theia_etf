@@ -1,0 +1,167 @@
+#ai-assistant-container {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 20px;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.ai-assistant-greeting {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+}
+
+.ai-assistant-greeting h3 {
+    margin: 0 0 10px 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--theia-foreground);
+}
+
+.ai-assistant-greeting p {
+    margin: 0;
+    font-size: 14px;
+    color: var(--theia-descriptionForeground);
+}
+
+.ai-assistant-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.ai-help-button {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 16px 20px !important;
+    font-size: 14px;
+    text-align: left;
+    min-height: 48px;
+    width: 100%;
+}
+
+.ai-help-button .button-icon {
+    margin-right: 12px;
+    font-size: 16px;
+    min-width: 20px;
+    text-align: center;
+}
+
+.ai-help-button:hover {
+    background-color: var(--theia-button-hoverBackground);
+}
+
+.ai-help-button span {
+    flex: 1;
+}
+
+/* Markdown rendering styles for AI responses */
+.ai-response-content {
+    line-height: 1.6;
+    color: var(--theia-foreground);
+}
+
+.ai-response-content p {
+    margin: 0 0 12px 0;
+}
+
+.ai-response-content p:last-child {
+    margin-bottom: 0;
+}
+
+.ai-response-content strong {
+    font-weight: 600;
+    color: var(--theia-foreground);
+}
+
+.ai-response-content em {
+    font-style: italic;
+}
+
+.ai-response-content code {
+    background-color: var(--theia-editor-background);
+    border: 1px solid var(--theia-editorWidget-border);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: var(--monaco-monospace-font);
+    font-size: 90%;
+}
+
+.ai-response-content pre {
+    background-color: var(--theia-editor-background);
+    border: 1px solid var(--theia-editorWidget-border);
+    padding: 12px;
+    border-radius: 4px;
+    overflow-x: auto;
+    margin: 12px 0;
+}
+
+.ai-response-content pre code {
+    background-color: transparent;
+    border: none;
+    padding: 0;
+    font-size: inherit;
+}
+
+.ai-response-content ul, .ai-response-content ol {
+    margin: 12px 0;
+    padding-left: 24px;
+}
+
+.ai-response-content li {
+    margin: 4px 0;
+}
+
+.ai-response-content h1, .ai-response-content h2, .ai-response-content h3,
+.ai-response-content h4, .ai-response-content h5, .ai-response-content h6 {
+    margin: 16px 0 8px 0;
+    font-weight: 600;
+    color: var(--theia-foreground);
+}
+
+.ai-response-content h1 { font-size: 1.8em; }
+.ai-response-content h2 { font-size: 1.5em; }
+.ai-response-content h3 { font-size: 1.3em; }
+.ai-response-content h4 { font-size: 1.1em; }
+
+.ai-response-content a {
+    color: var(--theia-textLink-foreground);
+    text-decoration: none;
+}
+
+.ai-response-content a:hover {
+    color: var(--theia-textLink-activeForeground);
+    text-decoration: underline;
+}
+
+.ai-response-content blockquote {
+    border-left: 3px solid var(--theia-editorWidget-border);
+    padding-left: 12px;
+    margin: 12px 0;
+    color: var(--theia-descriptionForeground);
+}
+
+.ai-response-content hr {
+    border: none;
+    border-top: 1px solid var(--theia-editorWidget-border);
+    margin: 16px 0;
+}
+
+.ai-response-content table {
+    border-collapse: collapse;
+    margin: 12px 0;
+}
+
+.ai-response-content th, .ai-response-content td {
+    border: 1px solid var(--theia-editorWidget-border);
+    padding: 6px 12px;
+}
+
+.ai-response-content th {
+    background-color: var(--theia-editor-background);
+    font-weight: 600;
+}
