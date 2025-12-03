@@ -530,6 +530,9 @@ export class AutotestService {
             isUserInvoked: false,
             rawResults: '',
         };
+        if (data.test_results) {
+            program.rawResults = data;
+        }
         
         if (this.getProgram(dirURI) === undefined && programId != -1 && taskId != -1)
             this.state.programs[dirURI] = program;
