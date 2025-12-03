@@ -39,7 +39,7 @@ export class UupGameViewContribution extends AbstractViewContribution<UupGameVie
 
     onStart(app: FrontendApplication): MaybePromise<void> {
             this.stateService.reachedState('ready').then(
-                () => this.openView({ activate: true, reveal: false })
+                () => this.openView({ activate: false, reveal: false })
             );
     }
 }
