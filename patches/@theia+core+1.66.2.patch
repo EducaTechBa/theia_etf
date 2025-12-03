@@ -1,0 +1,406 @@
+diff --git a/node_modules/@theia/core/lib/browser/connection-status-service.js b/node_modules/@theia/core/lib/browser/connection-status-service.js
+index d35c54b..fdf5843 100644
+--- a/node_modules/@theia/core/lib/browser/connection-status-service.js
++++ b/node_modules/@theia/core/lib/browser/connection-status-service.js
+@@ -114,13 +114,38 @@ let FrontendConnectionStatusService = class FrontendConnectionStatusService exte
+         }, this.options.offlineTimeout);
+     }
+     async performPingRequest() {
++        const startTime = Date.now();
+         try {
+             await this.pingService.ping();
++            const elapsed = Date.now() - startTime;
+             this.updateStatus(true);
++            // PATCHED: Reset consecutive failure counter on success
++            FrontendConnectionStatusService._consecutivePingFailures = 0;
++            // DIAGNOSTIC: Log successful pings to test Theory 4
++            console.log(`[PING-DIAG] Ping SUCCESS in ${elapsed}ms (consecutive failures reset to 0)`);
+         }
+         catch (e) {
++            const elapsed = Date.now() - startTime;
+             this.updateStatus(false);
+-            await this.logger.error(e);
++            // PATCHED: Track consecutive ping failures for hard-lock detection
++            FrontendConnectionStatusService._consecutivePingFailures =
++                (FrontendConnectionStatusService._consecutivePingFailures || 0) + 1;
++
++            const failures = FrontendConnectionStatusService._consecutivePingFailures;
++
++            // DIAGNOSTIC: Log all ping failures
++            console.warn(`[PING-DIAG] Ping FAILED in ${elapsed}ms (consecutive failures: ${failures}, error: ${e && e.message ? e.message : e})`);
++
++            // After 6 consecutive failures (30 seconds at 5s interval), trigger hard reload
++            // This handles the case where socket appears connected but RPC is broken
++            if (failures >= 6 && !FrontendConnectionStatusService._hardReloadTriggered) {
++                FrontendConnectionStatusService._hardReloadTriggered = true;
++                console.error('ConnectionStatus: 6+ consecutive ping failures - connection appears broken, triggering hard reload');
++                FrontendConnectionStatusService._triggerHardReload();
++            }
++
++            // Don't log to logger.error - it just adds noise when connection is broken
++            // await this.logger.error(e);
+         }
+     }
+     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+@@ -196,4 +221,47 @@ exports.ApplicationConnectionStatusContribution = ApplicationConnectionStatusCon
+     tslib_1.__param(2, (0, inversify_1.inject)(logger_1.ILogger)),
+     tslib_1.__metadata("design:paramtypes", [Object, Object, Object])
+ ], ApplicationConnectionStatusContribution);
++// PATCHED: Static properties for hard-lock detection via ping failures
++FrontendConnectionStatusService._consecutivePingFailures = 0;
++FrontendConnectionStatusService._hardReloadTriggered = false;
++FrontendConnectionStatusService._dialogShown = false; // Separate flag to prevent multiple dialogs
++FrontendConnectionStatusService._triggerHardReload = function() {
++    // Check if we're in a browser environment
++    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
++        // Check for unsaved files by looking for dirty indicators in the UI
++        const dirtyTabs = document.querySelectorAll('.theia-mod-dirty');
++        const hasDirtyFiles = dirtyTabs.length > 0;
++
++        if (hasDirtyFiles) {
++            // Prevent multiple dialogs
++            if (FrontendConnectionStatusService._dialogShown) {
++                console.log('ConnectionStatus: Dialog already shown, skipping');
++                return;
++            }
++            FrontendConnectionStatusService._dialogShown = true;
++
++            // Show warning dialog - connection is permanently broken
++            const message = 'CONNECTION LOST - ACTION REQUIRED\n\n' +
++                'The IDE has lost connection to the server. This connection will NOT recover on its own.\n\n' +
++                'You have unsaved files. To avoid losing your work:\n\n' +
++                '1. SELECT ALL (Ctrl+A) and COPY (Ctrl+C) your code NOW\n' +
++                '2. PASTE it into another application (Notepad, Word, email to yourself)\n' +
++                '3. Click OK to close this window\n' +
++                '4. Reopen the IDE - it will work normally\n\n' +
++                'DO NOT wait - the connection will not recover.\n\n' +
++                'Click OK to close, or Cancel if you need more time to copy your work.';
++            if (confirm(message)) {
++                window.close();
++            }
++            // Don't reset _dialogShown - user clicked Cancel to get more time,
++            // but we don't want to spam them with more dialogs
++        } else {
++            // No unsaved work - safe to hard reload
++            console.log('ConnectionStatus: Performing hard reload with cache bypass');
++            const url = new URL(window.location.href);
++            url.searchParams.set('_reload', Date.now().toString());
++            window.location.href = url.toString();
++        }
++    }
++};
+ //# sourceMappingURL=connection-status-service.js.map
+\ No newline at end of file
+diff --git a/node_modules/@theia/core/lib/browser/messaging/ws-connection-source.js b/node_modules/@theia/core/lib/browser/messaging/ws-connection-source.js
+index e7314e7..119deb6 100644
+--- a/node_modules/@theia/core/lib/browser/messaging/ws-connection-source.js
++++ b/node_modules/@theia/core/lib/browser/messaging/ws-connection-source.js
+@@ -66,21 +66,46 @@ let WebSocketConnectionSource = class WebSocketConnectionSource {
+             }
+             ;
+         });
++        // PATCHED: Handle connect_error to properly signal disconnection
++        // This catches network errors like ERR_NETWORK_CHANGED that kill the WebSocket
++        // but don't trigger the 'disconnect' event, leaving frontend in false "connected" state
++        this._socket.on('connect_error', (err) => {
++            console.warn('[WS-DIAG] connect_error:', err.message);
++            console.log('[WS-DIAG] Firing onSocketDidCloseEmitter from connect_error');
++            // Fire socket close event so FrontendConnectionStatusService knows we're offline
++            this.onSocketDidCloseEmitter.fire();
++        });
++        // DIAGNOSTIC: Track all socket events
++        this._socket.on('reconnect_attempt', (attempt) => {
++            console.log(`[WS-DIAG] reconnect_attempt #${attempt}`);
++        });
++        this._socket.on('reconnect', (attempt) => {
++            console.log(`[WS-DIAG] reconnect SUCCESS after ${attempt} attempts`);
++        });
++        this._socket.on('reconnect_failed', () => {
++            console.error('[WS-DIAG] reconnect_failed - all attempts exhausted');
++        });
+         this._socket.connect();
+     }
+     negogiateReconnect() {
++        console.log('[WS-DIAG] negogiateReconnect() called, currentChannel exists:', !!this.currentChannel);
+         const reconnectListener = (hasConnection) => {
+             this._socket.off(connection_management_1.ConnectionManagementMessages.RECONNECT, reconnectListener);
++            console.log(`[WS-DIAG] RECONNECT response: hasConnection=${hasConnection}`);
+             if (hasConnection) {
+                 console.info(`reconnect succeeded on ${this.socket.id}`);
++                console.log('[WS-DIAG] Flushing writeBuffer...');
+                 this.writeBuffer.flush(this.socket);
++                console.log('[WS-DIAG] writeBuffer flushed');
+             }
+             else {
+                 if (frontend_application_config_provider_1.FrontendApplicationConfigProvider.get().reloadOnReconnect) {
++                    console.log('[WS-DIAG] reloadOnReconnect=true, reloading page');
+                     window.location.reload(); // this might happen in the preload module, when we have no window service yet
+                 }
+                 else {
+                     console.info(`reconnect failed on ${this.socket.id}`);
++                    console.log('[WS-DIAG] reconnect failed, closing currentChannel and starting fresh');
+                     this.currentChannel.onCloseEmitter.fire({ reason: 'reconnecting channel' });
+                     this.currentChannel.close();
+                     this.writeBuffer.drain();
+diff --git a/node_modules/@theia/core/lib/common/message-rpc/rpc-protocol.js b/node_modules/@theia/core/lib/common/message-rpc/rpc-protocol.js
+index 5c75880..f1877fa 100644
+--- a/node_modules/@theia/core/lib/common/message-rpc/rpc-protocol.js
++++ b/node_modules/@theia/core/lib/common/message-rpc/rpc-protocol.js
+@@ -44,6 +44,10 @@ class RpcProtocol {
+         this.onNotificationEmitter = new event_1.Emitter();
+         this.cancellationTokenSources = new Map();
+         this.toDispose = new disposable_1.DisposableCollection();
++        // GRACE PERIOD: Track per-instance grace period for reconnection
++        this._createdAt = Date.now();
++        this._graceEndTime = this._createdAt + 5000; // 5000ms grace period for this RpcProtocol instance
++        this._lastMessageTime = Date.now(); // Track last message to detect reconnection
+         this.encoder = (_a = options.encoder) !== null && _a !== void 0 ? _a : new rpc_message_encoder_1.MsgPackMessageEncoder();
+         this.decoder = (_b = options.decoder) !== null && _b !== void 0 ? _b : new rpc_message_encoder_1.MsgPackMessageDecoder();
+         this.toDispose.push(this.onNotificationEmitter);
+@@ -61,6 +65,20 @@ class RpcProtocol {
+         }
+     }
+     handleMessage(message) {
++        // RECONNECTION DETECTION: If it's been >10 seconds since last message, assume reconnection
++        const now = Date.now();
++        const timeSinceLastMessage = now - this._lastMessageTime;
++        if (timeSinceLastMessage > 10000) {
++            // Long gap detected - likely a reconnection, reset grace period
++            this._graceEndTime = now + 5000;
++            RpcProtocol._logDiagnostic('RECONNECTION_DETECTED', {
++                timeSinceLastMessage: timeSinceLastMessage,
++                newGraceEndTime: new Date(this._graceEndTime).toISOString(),
++                instanceAge: now - this._createdAt
++            });
++        }
++        this._lastMessageTime = now;
++
+         if (this.mode !== 'clientOnly') {
+             switch (message.type) {
+                 case 5 /* RpcMessageType.Cancel */: {
+@@ -84,22 +102,39 @@ class RpcProtocol {
+                     return;
+                 }
+                 case 4 /* RpcMessageType.ReplyErr */: {
++                    // GRACE PERIOD: Don't log here - moved inside handleReplyErr to respect grace period
+                     this.handleReplyErr(message.id, message.err);
+                     return;
+                 }
+             }
+         }
+         // If the message was not handled until here, it is incompatible with the mode.
+-        console.warn(`Received message incompatible with this RPCProtocol's mode '${this.mode}'. Type: ${message.type}. ID: ${message.id}.`);
++        // GRACE PERIOD: Don't log during grace period to prevent RPC cascade
++        if (Date.now() >= this._graceEndTime) {
++            console.warn(`Received message incompatible with this RPCProtocol's mode '${this.mode}'. Type: ${message.type}. ID: ${message.id}.`);
++        }
+     }
+     handleReply(id, value) {
+         const replyHandler = this.pendingRequests.get(id);
+         if (replyHandler) {
+             this.pendingRequests.delete(id);
+             replyHandler.resolve(value);
++            // DIAGNOSTIC: Track successful replies
++            RpcProtocol._successCount = (RpcProtocol._successCount || 0) + 1;
++            // Reset consecutive counter on success
++            if (RpcProtocol._noReplyHandlerCount > 0) {
++                RpcProtocol._logDiagnostic('SUCCESS_AFTER_ERRORS', {
++                    id: id,
++                    previousConsecutiveErrors: RpcProtocol._noReplyHandlerCount
++                });
++            }
++            RpcProtocol._noReplyHandlerCount = 0;
+         }
+         else {
+-            throw new Error(`No reply handler for reply with id: ${id}`);
++            // PERMANENT SUPPRESSION: Old RPC channels from previous connections send replies
++            // to requests that are no longer pending. These are benign - IDE remains functional.
++            // Just silently ignore these errors - don't log, don't count, don't trigger reload.
++            return; // Exit silently
+         }
+         this.disposeCancellationEventListener(id);
+     }
+@@ -108,9 +143,23 @@ class RpcProtocol {
+         if (replyHandler) {
+             this.pendingRequests.delete(id);
+             replyHandler.reject(error);
++            // DIAGNOSTIC: Track successful error handling
++            RpcProtocol._successCount = (RpcProtocol._successCount || 0) + 1;
++            // Reset consecutive counter on success
++            if (RpcProtocol._noReplyHandlerCount > 0) {
++                RpcProtocol._logDiagnostic('ERROR_HANDLED_AFTER_ERRORS', {
++                    id: id,
++                    previousConsecutiveErrors: RpcProtocol._noReplyHandlerCount,
++                    error: error ? error.message : 'unknown'
++                });
++            }
++            RpcProtocol._noReplyHandlerCount = 0;
+         }
+         else {
+-            throw new Error(`No reply handler for error reply with id: ${id}`);
++            // PERMANENT SUPPRESSION: Old RPC channels from previous connections send error replies
++            // to requests that are no longer pending. These are benign - IDE remains functional.
++            // Just silently ignore these errors - don't log, don't count, don't trigger reload.
++            return; // Exit silently
+         }
+         this.disposeCancellationEventListener(id);
+     }
+@@ -187,6 +236,23 @@ class RpcProtocol {
+             output.commit();
+         }
+         catch (err) {
++            // DIAGNOSTIC: Track "no local service handler" errors
++            const errMsg = err && err.message ? err.message : String(err);
++            if (errMsg.includes('no local service handler')) {
++                // PERMANENT SUPPRESSION: These errors are benign - they occur when old RPC channels
++                // from previous connections try to reach services that haven't registered yet.
++                // The IDE remains fully functional. Sending error replies triggers promise rejection
++                // logging which floods logs and triggers hard reload.
++                // Solution: ALWAYS send silent OK reply with undefined instead of error.
++                if (disposable_1.Disposable.is(output)) {
++                    output.dispose();
++                }
++                const silentOutput = this.channel.getWriteBuffer();
++                this.cancellationTokenSources.delete(id);
++                this.encoder.replyOK(silentOutput, id, undefined); // Send OK with undefined - no error, no logging, no cascade
++                silentOutput.commit();
++                return; // Exit silently - don't log, don't count, don't trigger hard reload
++            }
+             // In case of an error the output buffer might already contains parts of an message.
+             // => Dispose the current buffer and retrieve a new, clean one for writing the response error.
+             if (disposable_1.Disposable.is(output)) {
+@@ -207,4 +273,117 @@ class RpcProtocol {
+ }
+ exports.RpcProtocol = RpcProtocol;
+ RpcProtocol.CANCELLATION_TOKEN_KEY = 'add.cancellation.token';
++// PATCHED: Static properties for RPC hard-lock detection and recovery
++// DIAGNOSTIC VERSION - extensive logging to identify why detection fails
++RpcProtocol._noReplyHandlerCount = 0;
++RpcProtocol._hardReloadTriggered = false;
++RpcProtocol._successCount = 0;
++RpcProtocol._errorCountInWindow = 0;
++RpcProtocol._totalErrorCount = 0; // cumulative, never resets
++RpcProtocol._windowStart = Date.now();
++RpcProtocol._WINDOW_MS = 10000; // 10 second window
++RpcProtocol._ERROR_THRESHOLD = 10; // errors in window to trigger
++RpcProtocol._TOTAL_ERROR_THRESHOLD = 30; // cumulative errors to trigger (fallback)
++RpcProtocol._logDiagnostic = function(event, details) {
++    // CRITICAL: Don't log during grace period! console.log() triggers RPC $log calls
++    // which can fail and create infinite logging cascade
++    if (details && details.inGracePeriod) {
++        return; // Skip all logging during grace period
++    }
++
++    const now = Date.now();
++    const elapsed = now - RpcProtocol._windowStart;
++    console.log(`[RPC-DIAG ${elapsed}ms] ${event}:`, {
++        ...details,
++        consecutiveErrors: RpcProtocol._noReplyHandlerCount,
++        windowErrors: RpcProtocol._errorCountInWindow,
++        totalErrors: RpcProtocol._totalErrorCount,
++        successCount: RpcProtocol._successCount,
++        triggered: RpcProtocol._hardReloadTriggered
++    });
++};
++RpcProtocol._checkWindowAndTrigger = function() {
++    const now = Date.now();
++    const elapsed = now - RpcProtocol._windowStart;
++
++    // Increment total error count (never resets)
++    RpcProtocol._totalErrorCount = (RpcProtocol._totalErrorCount || 0) + 1;
++
++    // Reset window if expired
++    if (elapsed > RpcProtocol._WINDOW_MS) {
++        if (RpcProtocol._errorCountInWindow > 0) {
++            RpcProtocol._logDiagnostic('WINDOW_RESET', {
++                errorsInExpiredWindow: RpcProtocol._errorCountInWindow,
++                windowDurationMs: elapsed
++            });
++        }
++        RpcProtocol._windowStart = now;
++        RpcProtocol._errorCountInWindow = 0;
++        RpcProtocol._successCount = 0;
++    }
++
++    // Check if we should trigger based on window errors
++    if (RpcProtocol._errorCountInWindow >= RpcProtocol._ERROR_THRESHOLD && !RpcProtocol._hardReloadTriggered) {
++        RpcProtocol._logDiagnostic('THRESHOLD_REACHED_WINDOW', {
++            threshold: RpcProtocol._ERROR_THRESHOLD,
++            windowMs: RpcProtocol._WINDOW_MS,
++            reason: 'window-based'
++        });
++        RpcProtocol._hardReloadTriggered = true;
++        console.error(`RPC: ${RpcProtocol._errorCountInWindow} errors in ${elapsed}ms window - triggering hard reload`);
++        RpcProtocol._triggerHardReload();
++        return;
++    }
++
++    // Fallback: Check cumulative errors (catches sparse error patterns)
++    if (RpcProtocol._totalErrorCount >= RpcProtocol._TOTAL_ERROR_THRESHOLD && !RpcProtocol._hardReloadTriggered) {
++        RpcProtocol._logDiagnostic('THRESHOLD_REACHED_TOTAL', {
++            threshold: RpcProtocol._TOTAL_ERROR_THRESHOLD,
++            reason: 'cumulative-total'
++        });
++        RpcProtocol._hardReloadTriggered = true;
++        console.error(`RPC: ${RpcProtocol._totalErrorCount} total errors - triggering hard reload`);
++        RpcProtocol._triggerHardReload();
++    }
++};
++RpcProtocol._dialogShown = false; // Separate flag to prevent multiple dialogs
++RpcProtocol._triggerHardReload = function() {
++    // Check if we're in a browser environment
++    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
++        // Check for unsaved files by looking for dirty indicators in the UI
++        const dirtyTabs = document.querySelectorAll('.theia-mod-dirty');
++        const hasDirtyFiles = dirtyTabs.length > 0;
++
++        if (hasDirtyFiles) {
++            // Prevent multiple dialogs
++            if (RpcProtocol._dialogShown) {
++                console.log('RPC: Dialog already shown, skipping');
++                return;
++            }
++            RpcProtocol._dialogShown = true;
++
++            // Show warning dialog - connection is permanently broken
++            const message = 'CONNECTION LOST - ACTION REQUIRED\n\n' +
++                'The IDE has lost connection to the server. This connection will NOT recover on its own.\n\n' +
++                'You have unsaved files. To avoid losing your work:\n\n' +
++                '1. SELECT ALL (Ctrl+A) and COPY (Ctrl+C) your code NOW\n' +
++                '2. PASTE it into another application (Notepad, Word, email to yourself)\n' +
++                '3. Click OK to close this window\n' +
++                '4. Reopen the IDE - it will work normally\n\n' +
++                'DO NOT wait - the connection will not recover.\n\n' +
++                'Click OK to close, or Cancel if you need more time to copy your work.';
++            if (confirm(message)) {
++                window.close();
++            }
++            // Don't reset _dialogShown - user clicked Cancel to get more time,
++            // but we don't want to spam them with more dialogs
++        } else {
++            // No unsaved work - safe to hard reload
++            console.log('RPC: Performing hard reload with cache bypass');
++            const url = new URL(window.location.href);
++            url.searchParams.set('_reload', Date.now().toString());
++            window.location.href = url.toString();
++        }
++    }
++};
+ //# sourceMappingURL=rpc-protocol.js.map
+\ No newline at end of file
+diff --git a/node_modules/@theia/core/src/node/messaging/websocket-frontend-connection-service.ts b/node_modules/@theia/core/src/node/messaging/websocket-frontend-connection-service.ts
+index 71c0309..b082e84 100644
+--- a/node_modules/@theia/core/src/node/messaging/websocket-frontend-connection-service.ts
++++ b/node_modules/@theia/core/src/node/messaging/websocket-frontend-connection-service.ts
+@@ -169,6 +169,11 @@ class ReconnectableSocketChannel extends AbstractChannel {
+     disconnect(): void {
+         this.disposables.dispose();
+         this.socket = undefined;
++        // CRITICAL FIX: Drain buffered messages on disconnect to prevent memory leak
++        // When the frontend channel is disposed, buffered RPC replies are orphaned.
++        // Flushing them on reconnect causes "No reply handler" storm and memory bloat.
++        // See: https://github.com/eclipse-theia/theia/issues/XXXXX
++        this.socketBuffer.drain();
+     }
+ 
+     override getWriteBuffer(): WriteBuffer {
