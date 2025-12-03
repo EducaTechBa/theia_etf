@@ -94,6 +94,7 @@ export class AssignmentsViewWidget extends TreeWidget {
         const workspaceRoot = this.workspaceService.workspace?.resource;
         if (!workspaceRoot) {
             this.messageService.error('No workspace is open');
+            console.log('No workspace is open')
             return;
         }
 
