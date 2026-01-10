@@ -3,9 +3,9 @@
   "keywords": [
     "theia-extension"
   ],
-  "version": "0.0.0",
+  "version": "1.2.1",
   "description": "Desct",
-  "author": "Rijad",
+  "author": "Mirza,Rijad,Tarik,Vedran",
   "files": [
     "lib",
     "src"
@@ -17,7 +17,7 @@
     "@theia/editor": "1.66.2",
     "@types/jszip": "^3.4.1",
     "jszip": "^3.5.0",
-    "top-bar": "0.0.0"
+    "top-bar": "1.2.0"
   },
   "devDependencies": {
     "@types/glob": "^8.1.0",

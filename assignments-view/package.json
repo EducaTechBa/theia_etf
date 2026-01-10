@@ -3,10 +3,10 @@
   "keywords": [
     "theia-extension"
   ],
-  "version": "0.0.0",
+  "version": "1.2.0",
   "description": "&#34;A",
   
-  "author": "&#34;Rijad",
+  "author": "Rijad,Vedran",
   
   "files": [
     "lib",
