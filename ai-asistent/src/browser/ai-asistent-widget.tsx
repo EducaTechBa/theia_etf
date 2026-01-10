@@ -8,6 +8,9 @@ import { TerminalService } from '@theia/terminal/lib/browser/base/terminal-servi
 import URI from '@theia/core/lib/common/uri';
 import { comingSoonImage, friendlyAssistantImage, tiredAssistantImage } from './encoded-images';
 import MarkdownIt = require('markdown-it');
+import { t, Language, Translations } from './translations';
+import { AIAsistentService } from './ai-asistent-service';
+import { WarningContext } from './ai-asistent-types';
 
 @injectable()
 export class AiAsistentWidget extends ReactWidget {
@@ -27,6 +30,9 @@ export class AiAsistentWidget extends ReactWidget {
     @inject(TerminalService)
     protected readonly terminalService: TerminalService;
 
+    @inject(AIAsistentService)
+    protected readonly aiService!: AIAsistentService;
+
     private isAvailable: boolean = false;
     private isChecking: boolean = true;
     private aiResponse: string = '';
@@ -34,16 +40,46 @@ export class AiAsistentWidget extends ReactWidget {
     private isProcessing: boolean = false;
     private quotaExceeded: boolean = false;
 
+    // Typing effect state
+    private typingQueue: string = ''; // Buffer for text waiting to be typed
+    private isTyping: boolean = false; // Whether typing animation is in progress
+    private typingIntervalId: number | undefined; // Interval ID for typing animation
+
     // Markdown renderer for AI responses
     private readonly markdownRenderer: MarkdownIt;
 
     // Multi-step form state for "Program output is wrong"
-    private outputWrongStep: number = 0; // 0=not started, 1=input form, 2=expected output form
+    private outputWrongStep: number = 0; // 0=not started, 1=instructions, 2=input form, 3=expected output form
     private currentCode: string = '';
     private currentPath: string = '';
+    private currentTask: string = '';
     private userInput: string = '';
     private programOutput: string = '';
     private expectedOutput: string = '';
+    private showInstructions: boolean = true; // Show instructions by default
+    private readonly INSTRUCTIONS_DISMISSED_KEY = 'ai-assistant-output-instructions-dismissed';
+
+    // Crash warning state
+    private showCrashWarning: boolean = false;
+    private crashCode: string = '';
+    private crashPath: string = '';
+    private crashTask: string = '';
+
+    // User feedback state
+    private feedbackGiven: boolean = false;
+    private showFeedbackThankYou: boolean = false;
+    private isProcessingFeedback: boolean = false;
+    private isProfessorResponse: boolean = false;
+
+    // Warning state for various validation checks
+    private showWhitespaceWarning: boolean = false;
+    private showCompileWarnWarning: boolean = false;
+    private showStaleGccWarning: boolean = false;
+    private showStaleAsanWarning: boolean = false;
+    private warningContext: WarningContext = {}; // Store context for "Proceed anyway" actions
+
+    // Localization
+    private language: Language = 'bs'; // Default to Bosnian
 
     constructor() {
         super();
@@ -56,6 +92,83 @@ export class AiAsistentWidget extends ReactWidget {
         });
     }
 
+    /**
+     * Toggle between English and Bosnian
+     */
+    private toggleLanguage() {
+        this.language = this.language === 'en' ? 'bs' : 'en';
+        this.update();
+    }
+
+    /**
+     * Handler for partial AI response (typing effect)
+     * Queues new text for character-by-character animation
+     */
+    private handlePartialResponse = (partialText: string) => {
+        // Add new text to the queue
+        this.typingQueue += partialText;
+
+        // Start typing animation if not already running
+        if (!this.isTyping) {
+            this.startTypingAnimation();
+        }
+    };
+
+    /**
+     * Start the character-by-character typing animation
+     */
+    private startTypingAnimation() {
+        if (this.isTyping) {
+            return; // Already typing
+        }
+
+        this.isTyping = true;
+        const TYPING_DELAY_MS = 50; // 50ms between characters
+
+        this.typingIntervalId = window.setInterval(() => {
+            if (this.typingQueue.length > 0) {
+                // Take first character from queue and add to response
+                const nextChar = this.typingQueue.charAt(0);
+                this.typingQueue = this.typingQueue.substring(1);
+                this.aiResponse += nextChar;
+                this.update();
+            } else {
+                // Queue is empty, stop typing
+                this.stopTypingAnimation();
+            }
+        }, TYPING_DELAY_MS);
+    }
+
+    /**
+     * Stop the typing animation
+     */
+    private stopTypingAnimation() {
+        if (this.typingIntervalId !== undefined) {
+            window.clearInterval(this.typingIntervalId);
+            this.typingIntervalId = undefined;
+        }
+        this.isTyping = false;
+    }
+
+    /**
+     * Clear typing state and stop animation
+     */
+    private clearTypingState() {
+        this.stopTypingAnimation();
+        this.typingQueue = '';
+    }
+
+    /**
+     * Flush typing queue immediately - used when final response is received
+     */
+    private flushTypingQueue() {
+        if (this.typingQueue.length > 0) {
+            this.aiResponse += this.typingQueue;
+            this.typingQueue = '';
+        }
+        this.stopTypingAnimation();
+    };
+
     @postConstruct()
     protected async init(): Promise<void> {
         this.id = AiAsistentWidget.ID;
@@ -63,6 +176,10 @@ export class AiAsistentWidget extends ReactWidget {
         this.title.caption = AiAsistentWidget.LABEL;
         this.title.closable = true;
         this.title.iconClass = 'fa fa-lightbulb-o';
+
+        // Load instruction preference
+        const dismissed = localStorage.getItem(this.INSTRUCTIONS_DISMISSED_KEY);
+        this.showInstructions = dismissed !== 'true';
 
         // Check if AI assistant is available
         await this.checkAvailability();
@@ -121,28 +238,38 @@ export class AiAsistentWidget extends ReactWidget {
                     style={{ maxWidth: '80%', height: 'auto', marginBottom: '20px' }}
                 />
                 <h2 style={{ fontSize: '20px', marginBottom: '15px', color: 'var(--theia-errorForeground)' }}>
-                    Daily AI Request Quota Exceeded
+                    {t(this.language, 'quotaTitle')}
                 </h2>
                 <p style={{ fontSize: '14px', lineHeight: '1.6', color: 'var(--theia-foreground)', opacity: 0.8 }}>
-                    You have reached your daily limit for AI assistant requests.
-                    <br/>
-                    You will be able to ask your next question tomorrow or next week,
-                    <br/>
-                    according to the rules set by your course teacher.
+                    {t(this.language, 'quotaMessage')}
                 </p>
                 <button
                     className="theia-button"
                     onClick={() => this.clearResponse()}
                     style={{ marginTop: '20px' }}
                 >
-                    Back
+                    {t(this.language, 'back')}
                 </button>
             </div>;
         }
 
         // Show normal AI assistant interface if available
         return <div id='ai-assistant-container'>
-            {!this.isProcessing && !this.aiResponse && !this.errorMessage && this.outputWrongStep === 0 && (
+            {/* Language toggle - always visible */}
+            <div style={{ textAlign: 'right', padding: '10px' }}>
+                <button
+                    className="theia-button secondary"
+                    onClick={() => this.toggleLanguage()}
+                    style={{ fontSize: '12px' }}
+                    title={this.language === 'en' ? 'Switch to Bosnian/Croatian/Serbian' : 'Prebaci na engleski'}
+                >
+                    {this.language === 'en' ? '🇧🇦 Bosanski/Hrvatski/Srpski' : '🇬🇧 English'}
+                </button>
+            </div>
+
+            {!this.isProcessing && !this.aiResponse && !this.errorMessage && this.outputWrongStep === 0 &&
+             !this.showCrashWarning && !this.showWhitespaceWarning && !this.showCompileWarnWarning &&
+             !this.showStaleGccWarning && !this.showStaleAsanWarning && (
                 <>
                     <div className='ai-assistant-greeting' style={{ textAlign: 'center' }}>
                         <img
@@ -150,26 +277,33 @@ export class AiAsistentWidget extends ReactWidget {
                             alt="AI Teaching Assistant"
                             style={{ maxWidth: '100%', height: 'auto', marginBottom: '10px' }}
                         />
-                        <h3>Hello, I'm your AI teaching assistant!</h3>
-                        <p>What can I help you with?</p>
+                        <h3>{t(this.language, 'greeting')}</h3>
+                        <p>{t(this.language, 'question')}</p>
                     </div>
 
                     <div className='ai-assistant-buttons'>
-                        {this.renderHelpButton('Code doesn\'t compile', 'fa fa-exclamation-triangle')}
-                        {this.renderHelpButton('Program output is wrong', 'fa fa-bug')}
-                        {this.renderHelpButton('Program is crashing', 'fa fa-bomb')}
-                        {this.renderHelpButton('Tests are failing', 'fa fa-times-circle')}
+                        {this.renderHelpButton('compile-error', t(this.language, 'compileError'), 'fa fa-exclamation-triangle')}
+                        {this.renderHelpButton('wrong-output', t(this.language, 'wrongOutput'), 'fa fa-bug')}
+                        {this.renderHelpButton('crashing', t(this.language, 'crashing'), 'fa fa-bomb')}
+                        {this.renderHelpButton('tests-failing', t(this.language, 'testsFailing'), 'fa fa-times-circle')}
                     </div>
                 </>
             )}
 
-            {!this.isProcessing && this.outputWrongStep === 1 && this.renderOutputWrongInputForm()}
-            {!this.isProcessing && this.outputWrongStep === 2 && this.renderOutputWrongExpectedForm()}
+            {!this.isProcessing && this.outputWrongStep === 1 && this.renderOutputInstructions()}
+            {!this.isProcessing && this.outputWrongStep === 2 && this.renderOutputWrongInputForm()}
+            {!this.isProcessing && this.outputWrongStep === 3 && this.renderOutputWrongExpectedForm()}
+
+            {this.showCrashWarning && this.renderCrashWarning()}
+            {this.showWhitespaceWarning && this.renderGenericWarning('whitespaceWarningTitle', 'whitespaceWarningMessage', () => this.proceedWithWhitespaceWarning())}
+            {this.showCompileWarnWarning && this.renderGenericWarning('compileWarnTitle', 'compileWarnMessage', () => this.proceedWithCompileWarnWarning())}
+            {this.showStaleGccWarning && this.renderGenericWarning('staleGccTitle', 'staleGccMessage', () => this.proceedWithStaleGccWarning())}
+            {this.showStaleAsanWarning && this.renderGenericWarning('staleAsanTitle', 'staleAsanMessage', () => this.proceedWithStaleAsanWarning())}
 
             {this.isProcessing && (
                 <div style={{ textAlign: 'center', padding: '40px' }}>
                     <div className="ai-spinner"></div>
-                    <p className="ai-spinner-text">Processing your request...</p>
+                    <p className="ai-spinner-text">{t(this.language, 'processing')}</p>
                     <style>{`
                         @keyframes spin {
                             0% { transform: rotate(0deg); }
@@ -196,41 +330,58 @@ export class AiAsistentWidget extends ReactWidget {
 
             {this.errorMessage && (
                 <div style={{ padding: '15px' }}>
-                    <h4 style={{ color: '#f44336', marginBottom: '10px' }}>Error</h4>
+                    <h4 style={{ color: '#f44336', marginBottom: '10px' }}>{t(this.language, 'error')}</h4>
                     <p style={{ color: '#d32f2f' }}>{this.errorMessage}</p>
                     <button
                         className="theia-button"
                         onClick={() => this.clearResponse()}
                         style={{ marginTop: '10px' }}
                     >
-                        Back
+                        {t(this.language, 'back')}
                     </button>
                 </div>
             )}
 
-            {this.aiResponse && (
+            {this.isProcessingFeedback && (
+                <div style={{ padding: '15px', textAlign: 'center' }}>
+                    <div style={{ marginBottom: '15px' }}>
+                        <i className="fa fa-spinner fa-spin" style={{ fontSize: '32px', color: '#007ACC' }}></i>
+                    </div>
+                    <p style={{ fontSize: '14px', color: '#888' }}>
+                        {t(this.language, 'feedbackProcessing')}
+                    </p>
+                </div>
+            )}
+
+            {this.aiResponse && !this.isProcessingFeedback && (
                 <div style={{ padding: '15px' }}>
-                    <h4 style={{ marginBottom: '10px' }}>AI Response</h4>
+                    <h4 style={{ marginBottom: '10px' }}>
+                        {t(this.language, this.isProfessorResponse ? 'aiProfessorResponse' : 'aiResponse')}
+                    </h4>
                     <div
                         className="ai-response-content"
                         dangerouslySetInnerHTML={{ __html: this.markdownRenderer.render(this.aiResponse) }}
                     />
+
+                    {/* User feedback buttons */}
+                    {this.renderFeedbackButtons()}
+
                     <button
                         className="theia-button"
                         onClick={() => this.clearResponse()}
                         style={{ marginTop: '15px' }}
                     >
-                        Back
+                        {t(this.language, 'back')}
                     </button>
                 </div>
             )}
         </div>
     }
 
-    private renderHelpButton(text: string, iconClass: string): React.ReactNode {
+    private renderHelpButton(topicId: string, text: string, iconClass: string): React.ReactNode {
         return <button
             className="theia-button ai-help-button"
-            onClick={() => this.handleHelpButtonClick(text)}
+            onClick={() => this.handleHelpButtonClick(topicId)}
         >
             <i className={`button-icon ${iconClass}`} aria-hidden="true"></i>
             <span>{text}</span>
@@ -238,44 +389,31 @@ export class AiAsistentWidget extends ReactWidget {
     }
 
     private clearResponse() {
+        this.clearTypingState(); // Stop any ongoing typing animation
         this.aiResponse = '';
         this.errorMessage = '';
         this.quotaExceeded = false;
         this.outputWrongStep = 0;
         this.currentCode = '';
         this.currentPath = '';
+        this.currentTask = '';
         this.userInput = '';
         this.programOutput = '';
         this.expectedOutput = '';
+        this.showCrashWarning = false;
+        this.crashCode = '';
+        this.crashPath = '';
+        this.crashTask = '';
+        this.feedbackGiven = false;
+        this.showFeedbackThankYou = false;
+        this.isProcessingFeedback = false;
+        this.isProfessorResponse = false;
+        this.showWhitespaceWarning = false;
+        this.showCompileWarnWarning = false;
+        this.showStaleGccWarning = false;
+        this.showStaleAsanWarning = false;
+        this.warningContext = {};
         this.update();
-    }
-
-    private async handleApiError(response: Response): Promise<void> {
-        // Handle common API errors with friendly messages
-        if (response.status === 400) {
-            try {
-                const errorData = await response.json().catch(() => ({}));
-                if (errorData.message && errorData.message.toLowerCase().includes('too many requests')) {
-                    this.quotaExceeded = true;
-                    return;
-                }
-                this.errorMessage = errorData.message || 'Bad request. Please try again.';
-            } catch (e) {
-                this.errorMessage = 'Bad request. Please try again.';
-            }
-        } else if (response.status === 401) {
-            this.errorMessage = 'You are not authorized to use the AI assistant. Please check with your course instructor.';
-        } else if (response.status === 403) {
-            this.errorMessage = 'Access forbidden. Please check with your course instructor.';
-        } else if (response.status === 429) {
-            // Rate limit exceeded
-            this.quotaExceeded = true;
-        } else if (response.status >= 500) {
-            this.errorMessage = 'The AI service is temporarily unavailable. Please try again later.';
-        } else {
-            const errorData = await response.json().catch(() => ({}));
-            this.errorMessage = errorData.message || `API error: ${response.status}`;
-        }
     }
 
     private getRelativePath(fileUri: URI): string {
@@ -292,11 +430,262 @@ export class AiAsistentWidget extends ReactWidget {
             : absolutePath;
     }
 
+    /**
+     * Get task specification from task.html in the same directory as the file
+     */
+    private async getTaskSpecification(fileUri: URI): Promise<string> {
+        try {
+            const fileDir = fileUri.parent;
+            return await this.aiService.readTaskSpecification(fileDir);
+        } catch (error) {
+            console.warn('AI Assistant: Error reading task specification', error);
+            return '';
+        }
+    }
+
+    private renderOutputInstructions(): React.ReactNode {
+        const instructions = this.language === 'bs' ? {
+            title: '📋 Kako pripremiti ulaz i izlaz',
+            step1: 'Pokrenite svoj program prvo',
+            step1Desc: 'Kliknite na "Run" dugme i unesite ulaz kada se od vas zatraži',
+            step2: 'Kopirajte ulaz iz terminala',
+            step2Desc: 'Selektujte i kopirajte TAČNO ono što ste ukucali (npr. "5 3")',
+            step2Example: '5 3',
+            step2ExampleLabel: '← Kopirajte ovo',
+            step3: 'Kopirajte stvarni izlaz iz terminala',
+            step3Desc: 'Selektujte i kopirajte ono što je vaš program ispisao (NE kod!)',
+            step3Example: '7',
+            step3ExampleLabel: '← Kopirajte ovo',
+            step4: 'Kopirajte očekivani izlaz iz zadatka',
+            step4Desc: 'Pogledajte opis zadatka da vidite šta bi izlaz trebao biti',
+            step4Example: 'Očekivano: ',
+            step4ExampleValue: '8',
+            mistakesTitle: 'Česte greške',
+            mistake1: 'Nikada ne zalijepite KOD u polja za izlaz - samo zalijepite ono što je program ISPISAO',
+            mistake2: 'Kopirajte iz terminala, a ne iz memorije',
+            mistake3: 'Kopirajte tačno - razmaci i novi redovi su bitni',
+            mistake4: 'Za opća pitanja, koristite forum kursa ili konsultacije',
+            dontShowAgain: 'Ne prikazuj ovo ponovo',
+            iUnderstand: 'Razumijem - Nastavi'
+        } : {
+            title: '📋 How to prepare Input and Output',
+            step1: 'Run your program first',
+            step1Desc: 'Click the "Run" button and enter input when prompted',
+            step2: 'Copy input from terminal',
+            step2Desc: 'Select and copy EXACTLY what you typed (e.g., "5 3")',
+            step2Example: '5 3',
+            step2ExampleLabel: '← Copy this',
+            step3: 'Copy actual output from terminal',
+            step3Desc: 'Select and copy what your program printed (NOT the code!)',
+            step3Example: '7',
+            step3ExampleLabel: '← Copy this',
+            step4: 'Copy expected output from assignment',
+            step4Desc: 'Look at the assignment description for what the output should be',
+            step4Example: 'Expected: ',
+            step4ExampleValue: '8',
+            mistakesTitle: 'Common Mistakes',
+            mistake1: 'Never paste CODE in the output fields - only paste what the program PRINTED',
+            mistake2: 'Copy from terminal, not from memory',
+            mistake3: 'Copy exactly - spaces and newlines matter',
+            mistake4: 'For general questions, use course forum or office hours',
+            dontShowAgain: 'Don\'t show this again',
+            iUnderstand: 'I Understand - Continue'
+        };
+
+        return <div style={{ padding: '15px', backgroundColor: 'var(--theia-editor-background)' }}>
+            <h4 style={{ marginBottom: '15px', color: 'var(--theia-focusBorder)' }}>
+                {instructions.title}
+            </h4>
+
+            {/* Visual step-by-step guide */}
+            <div style={{ marginBottom: '20px' }}>
+                {/* Step 1 */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: '12px' }}>
+                    <div style={{
+                        backgroundColor: 'var(--theia-focusBorder)',
+                        color: 'white',
+                        borderRadius: '50%',
+                        width: '24px',
+                        height: '24px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: '10px',
+                        flexShrink: 0
+                    }}>1</div>
+                    <div>
+                        <strong>{instructions.step1}</strong>
+                        <p style={{ fontSize: '12px', opacity: 0.8, margin: '4px 0 0 0' }}>
+                            {instructions.step1Desc}
+                        </p>
+                    </div>
+                </div>
+
+                {/* Step 2 */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: '12px' }}>
+                    <div style={{
+                        backgroundColor: 'var(--theia-focusBorder)',
+                        color: 'white',
+                        borderRadius: '50%',
+                        width: '24px',
+                        height: '24px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: '10px',
+                        flexShrink: 0
+                    }}>2</div>
+                    <div style={{ flexGrow: 1 }}>
+                        <strong>{instructions.step2}</strong>
+                        <p style={{ fontSize: '12px', opacity: 0.8, margin: '4px 0 0 0' }}>
+                            {instructions.step2Desc}
+                        </p>
+                        <div style={{
+                            backgroundColor: '#1e1e1e',
+                            padding: '8px',
+                            marginTop: '6px',
+                            fontFamily: 'monospace',
+                            fontSize: '11px',
+                            border: '1px solid #444',
+                            borderRadius: '3px'
+                        }}>
+                            $ ./program<br />
+                            <span style={{ color: '#4EC9B0' }}>{instructions.step2Example}</span> {instructions.step2ExampleLabel}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Step 3 */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: '12px' }}>
+                    <div style={{
+                        backgroundColor: 'var(--theia-focusBorder)',
+                        color: 'white',
+                        borderRadius: '50%',
+                        width: '24px',
+                        height: '24px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: '10px',
+                        flexShrink: 0
+                    }}>3</div>
+                    <div style={{ flexGrow: 1 }}>
+                        <strong>{instructions.step3}</strong>
+                        <p style={{ fontSize: '12px', opacity: 0.8, margin: '4px 0 0 0' }}>
+                            {instructions.step3Desc}
+                        </p>
+                        <div style={{
+                            backgroundColor: '#1e1e1e',
+                            padding: '8px',
+                            marginTop: '6px',
+                            fontFamily: 'monospace',
+                            fontSize: '11px',
+                            border: '1px solid #444',
+                            borderRadius: '3px'
+                        }}>
+                            $ ./program<br />
+                            {instructions.step2Example}<br />
+                            <span style={{ color: '#CE9178' }}>{instructions.step3Example}</span> {instructions.step3ExampleLabel}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Step 4 */}
+                <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+                    <div style={{
+                        backgroundColor: 'var(--theia-focusBorder)',
+                        color: 'white',
+                        borderRadius: '50%',
+                        width: '24px',
+                        height: '24px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: '10px',
+                        flexShrink: 0
+                    }}>4</div>
+                    <div style={{ flexGrow: 1 }}>
+                        <strong>{instructions.step4}</strong>
+                        <p style={{ fontSize: '12px', opacity: 0.8, margin: '4px 0 0 0' }}>
+                            {instructions.step4Desc}
+                        </p>
+                        <div style={{
+                            backgroundColor: '#1e1e1e',
+                            padding: '8px',
+                            marginTop: '6px',
+                            fontFamily: 'monospace',
+                            fontSize: '11px',
+                            border: '1px solid #444',
+                            borderRadius: '3px'
+                        }}>
+                            {instructions.step4Example}<span style={{ color: '#4EC9B0' }}>{instructions.step4ExampleValue}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Warning box */}
+            <div style={{
+                backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                border: '1px solid rgba(255, 193, 7, 0.5)',
+                padding: '12px',
+                marginBottom: '15px',
+                borderRadius: '4px'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
+                    <i className="fa fa-exclamation-triangle" style={{ color: '#FFC107', marginRight: '8px' }}></i>
+                    <strong style={{ color: '#FFC107' }}>{instructions.mistakesTitle}</strong>
+                </div>
+                <ul style={{ fontSize: '12px', margin: '0', paddingLeft: '20px', lineHeight: '1.6' }}>
+                    <li>{instructions.mistake1}</li>
+                    <li>{instructions.mistake2}</li>
+                    <li>{instructions.mistake3}</li>
+                    <li>{instructions.mistake4}</li>
+                </ul>
+            </div>
+
+            {/* Checkbox and buttons */}
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '15px' }}>
+                <input
+                    type="checkbox"
+                    id="dont-show-again"
+                    style={{ marginRight: '8px' }}
+                />
+                <label htmlFor="dont-show-again" style={{ fontSize: '12px', cursor: 'pointer' }}>
+                    {instructions.dontShowAgain}
+                </label>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                    className="theia-button"
+                    onClick={() => this.clearResponse()}
+                >
+                    {t(this.language, 'cancel')}
+                </button>
+                <button
+                    className="theia-button primary"
+                    onClick={() => {
+                        const checkbox = document.getElementById('dont-show-again') as HTMLInputElement;
+                        if (checkbox?.checked) {
+                            localStorage.setItem(this.INSTRUCTIONS_DISMISSED_KEY, 'true');
+                            this.showInstructions = false;
+                        }
+                        this.outputWrongStep = 2;
+                        this.update();
+                    }}
+                >
+                    {instructions.iUnderstand}
+                </button>
+            </div>
+        </div>;
+    }
+
     private renderOutputWrongInputForm(): React.ReactNode {
         return <div style={{ padding: '15px' }}>
-            <h4 style={{ marginBottom: '10px' }}>Step 1: Input and Output</h4>
+            <h4 style={{ marginBottom: '10px' }}>{t(this.language, 'step1Title')}</h4>
             <p style={{ marginBottom: '10px', fontSize: '12px' }}>
-                Enter the input values your program received (or leave empty if none):
+                {t(this.language, 'step1InputPrompt')}
             </p>
             <textarea
                 value={this.userInput}
@@ -311,11 +700,11 @@ export class AiAsistentWidget extends ReactWidget {
                     border: '1px solid #ccc',
                     borderRadius: '4px'
                 }}
-                placeholder="Enter input values..."
+                placeholder={t(this.language, 'step1InputPlaceholder')}
             />
 
             <p style={{ marginBottom: '10px', fontSize: '12px' }}>
-                Copy and paste your program's output here:
+                {t(this.language, 'step1OutputPrompt')}
             </p>
             <textarea
                 value={this.programOutput}
@@ -330,7 +719,7 @@ export class AiAsistentWidget extends ReactWidget {
                     border: '1px solid #ccc',
                     borderRadius: '4px'
                 }}
-                placeholder="Paste program output..."
+                placeholder={t(this.language, 'step1OutputPlaceholder')}
             />
 
             <div style={{ display: 'flex', gap: '10px' }}>
@@ -338,14 +727,14 @@ export class AiAsistentWidget extends ReactWidget {
                     className="theia-button"
                     onClick={() => this.clearResponse()}
                 >
-                    Cancel
+                    {t(this.language, 'cancel')}
                 </button>
                 <button
                     className="theia-button"
-                    onClick={() => { this.outputWrongStep = 2; this.update(); }}
+                    onClick={() => { this.outputWrongStep = 3; this.update(); }}
                     disabled={!this.programOutput}
                 >
-                    Continue
+                    {t(this.language, 'continue')}
                 </button>
             </div>
         </div>;
@@ -353,9 +742,9 @@ export class AiAsistentWidget extends ReactWidget {
 
     private renderOutputWrongExpectedForm(): React.ReactNode {
         return <div style={{ padding: '15px' }}>
-            <h4 style={{ marginBottom: '10px' }}>Step 2: Expected Output</h4>
+            <h4 style={{ marginBottom: '10px' }}>{t(this.language, 'step2Title')}</h4>
             <p style={{ marginBottom: '10px', fontSize: '12px' }}>
-                Enter or paste the expected output for your program:
+                {t(this.language, 'step2Prompt')}
             </p>
             <textarea
                 value={this.expectedOutput}
@@ -370,40 +759,347 @@ export class AiAsistentWidget extends ReactWidget {
                     border: '1px solid #ccc',
                     borderRadius: '4px'
                 }}
-                placeholder="Enter expected output..."
+                placeholder={t(this.language, 'step2Placeholder')}
             />
 
             <div style={{ display: 'flex', gap: '10px' }}>
                 <button
                     className="theia-button"
-                    onClick={() => { this.outputWrongStep = 1; this.update(); }}
+                    onClick={() => { this.outputWrongStep = 2; this.update(); }}
                 >
-                    Back
+                    {t(this.language, 'back')}
                 </button>
                 <button
                     className="theia-button"
                     onClick={() => this.submitOutputWrongRequest()}
                     disabled={!this.expectedOutput}
                 >
-                    Get AI Help
+                    {t(this.language, 'getHelp')}
                 </button>
             </div>
         </div>;
     }
 
-    private async handleHelpButtonClick(topic: string) {
-        console.log(`AI Assistant: User needs help with - ${topic}`);
+    private renderCrashWarning(): React.ReactNode {
+        return <div style={{ padding: '20px' }}>
+            <div style={{
+                backgroundColor: 'rgba(255, 193, 7, 0.15)',
+                border: '2px solid #FFC107',
+                borderRadius: '8px',
+                padding: '20px',
+                marginBottom: '20px'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '15px' }}>
+                    <i className="fa fa-exclamation-triangle" style={{
+                        fontSize: '32px',
+                        color: '#FFC107',
+                        marginRight: '15px'
+                    }}></i>
+                    <h3 style={{
+                        margin: 0,
+                        color: '#FFC107',
+                        fontSize: '18px'
+                    }}>
+                        {t(this.language, 'crashWarningTitle')}
+                    </h3>
+                </div>
 
-        if (topic === 'Code doesn\'t compile') {
+                <p style={{
+                    fontSize: '14px',
+                    lineHeight: '1.6',
+                    marginBottom: '0',
+                    whiteSpace: 'pre-wrap'
+                }}>
+                    {t(this.language, 'crashWarningMessage')}
+                </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                <button
+                    className="theia-button"
+                    onClick={() => this.clearResponse()}
+                    style={{ minWidth: '120px' }}
+                >
+                    {t(this.language, 'cancel')}
+                </button>
+                <button
+                    className="theia-button secondary"
+                    onClick={() => this.proceedWithCrashAnalysis()}
+                    style={{ minWidth: '120px' }}
+                >
+                    {t(this.language, 'proceedAnyway')}
+                </button>
+            </div>
+        </div>;
+    }
+
+    private async proceedWithCrashAnalysis() {
+        try {
+            this.isProcessing = true;
+            this.showCrashWarning = false;
+            this.errorMessage = '';
+            this.clearTypingState();
+            this.aiResponse = '';
+            this.isProfessorResponse = false;
+            this.update();
+
+            // Call API with empty asan output (guessing mode)
+            const result = await this.aiService.submitCrashRequest(
+                'crash',
+                this.crashPath,
+                this.crashCode,
+                '', // Empty - AI will guess
+                this.crashTask,
+                this.handlePartialResponse
+            );
+
+            if (result.error) {
+                if (result.error === 'QUOTA_EXCEEDED') {
+                    this.quotaExceeded = true;
+                } else {
+                    this.errorMessage = result.error;
+                }
+            } else {
+                this.flushTypingQueue();
+                this.aiResponse = result.data || '';
+            }
+
+        } catch (error) {
+            console.error('AI Assistant: Error in proceedWithCrashAnalysis', error);
+            this.errorMessage = `Unexpected error: ${error}`;
+        } finally {
+            this.isProcessing = false;
+            this.crashCode = '';
+            this.crashPath = '';
+            this.crashTask = '';
+            this.update();
+        }
+    }
+
+    private renderGenericWarning(titleKey: keyof Translations, messageKey: keyof Translations, onProceed: () => void): React.ReactNode {
+        return <div style={{ padding: '20px' }}>
+            <div style={{
+                backgroundColor: 'rgba(255, 193, 7, 0.15)',
+                border: '2px solid #FFC107',
+                borderRadius: '8px',
+                padding: '20px',
+                marginBottom: '20px'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '15px' }}>
+                    <i className="fa fa-exclamation-triangle" style={{
+                        fontSize: '32px',
+                        color: '#FFC107',
+                        marginRight: '15px'
+                    }}></i>
+                    <h3 style={{
+                        margin: 0,
+                        color: '#FFC107',
+                        fontSize: '18px'
+                    }}>
+                        {t(this.language, titleKey)}
+                    </h3>
+                </div>
+
+                <p style={{
+                    fontSize: '14px',
+                    lineHeight: '1.6',
+                    marginBottom: '0',
+                    whiteSpace: 'pre-wrap'
+                }}>
+                    {t(this.language, messageKey)}
+                </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                <button
+                    className="theia-button"
+                    onClick={() => this.clearResponse()}
+                    style={{ minWidth: '120px' }}
+                >
+                    {t(this.language, 'cancel')}
+                </button>
+                <button
+                    className="theia-button secondary"
+                    onClick={onProceed}
+                    style={{ minWidth: '120px' }}
+                >
+                    {t(this.language, 'proceedAnyway')}
+                </button>
+            </div>
+        </div>;
+    }
+
+    private async proceedWithWhitespaceWarning() {
+        this.showWhitespaceWarning = false;
+        await this.submitOutputWrongRequest('output_whitespace');
+    }
+
+    private async proceedWithCompileWarnWarning() {
+        this.showCompileWarnWarning = false;
+        // Re-fetch files and proceed
+        const context = this.warningContext;
+        if (context.relativePath && context.code && context.gccOutput) {
+            await this.submitCompileRequest('compile_warn', context.relativePath, context.code, context.gccOutput, context.task);
+        }
+    }
+
+    private async proceedWithStaleGccWarning() {
+        this.showStaleGccWarning = false;
+        // Re-fetch both files
+        const context = this.warningContext;
+        if (!context.fileUri || !context.gccOutUri || !context.relativePath) {
+            this.errorMessage = 'Missing file information in warning context';
+            this.update();
+            return;
+        }
+        try {
+            const fileContent = await this.fileService.read(context.fileUri);
+            const gccOutContent = await this.fileService.read(context.gccOutUri);
+            await this.submitCompileRequest('compile', context.relativePath, fileContent.value, gccOutContent.value, context.task);
+        } catch (error) {
+            this.errorMessage = `Error re-reading files: ${error}`;
+            this.update();
+        }
+    }
+
+    private async proceedWithStaleAsanWarning() {
+        this.showStaleAsanWarning = false;
+        // Re-fetch both files
+        const context = this.warningContext;
+        if (!context.fileUri || !context.asanOutUri || !context.relativePath) {
+            this.errorMessage = 'Missing file information in warning context';
+            this.update();
+            return;
+        }
+        try {
+            const fileContent = await this.fileService.read(context.fileUri);
+            const asanOutContent = await this.fileService.read(context.asanOutUri);
+            await this.submitCrashRequest('crash', context.relativePath, fileContent.value, asanOutContent.value, context.task);
+        } catch (error) {
+            this.errorMessage = `Error re-reading files: ${error}`;
+            this.update();
+        }
+    }
+
+    private renderFeedbackButtons(): React.ReactNode {
+        // If feedback already given, show thank you message
+        if (this.showFeedbackThankYou) {
+            return <div style={{
+                marginTop: '20px',
+                padding: '15px',
+                backgroundColor: 'rgba(76, 175, 80, 0.15)',
+                border: '1px solid rgba(76, 175, 80, 0.3)',
+                borderRadius: '6px',
+                textAlign: 'center'
+            }}>
+                <i className="fa fa-check-circle" style={{
+                    fontSize: '24px',
+                    color: '#4CAF50',
+                    marginRight: '10px'
+                }}></i>
+                <span style={{ fontSize: '14px', color: '#4CAF50' }}>
+                    {t(this.language, 'feedbackThankYou')}
+                </span>
+            </div>;
+        }
+
+        // If feedback not yet given, show feedback buttons
+        if (!this.feedbackGiven) {
+            return <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid var(--theia-panel-border)' }}>
+                <p style={{ fontSize: '14px', marginBottom: '15px', fontWeight: 'bold' }}>
+                    {t(this.language, 'feedbackQuestion')}
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <button
+                        className="theia-button secondary"
+                        onClick={() => this.submitFeedback('helpful')}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', padding: '10px 15px' }}
+                    >
+                        <span style={{ fontSize: '20px', marginRight: '10px' }}>👍</span>
+                        <span>{t(this.language, 'feedbackHelpful')}</span>
+                    </button>
+                    <button
+                        className="theia-button secondary"
+                        onClick={() => this.submitFeedback('not-helpful')}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', padding: '10px 15px' }}
+                    >
+                        <span style={{ fontSize: '20px', marginRight: '10px' }}>👎</span>
+                        <span>{t(this.language, 'feedbackNotHelpful')}</span>
+                    </button>
+                    <button
+                        className="theia-button secondary"
+                        onClick={() => this.submitFeedback('confusing')}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', padding: '10px 15px' }}
+                    >
+                        <span style={{ fontSize: '20px', marginRight: '10px' }}>❓</span>
+                        <span>{t(this.language, 'feedbackConfusing')}</span>
+                    </button>
+                </div>
+            </div>;
+        }
+
+        return null;
+    }
+
+    private async submitFeedback(feedback: string) {
+        console.log(`AI Assistant: User feedback - ${feedback}`);
+
+        // Show processing state
+        this.isProcessingFeedback = true;
+        this.clearTypingState(); // Stop any ongoing typing and clear queue
+        this.aiResponse = ''; // Clear previous response for typing effect
+        this.update();
+
+        // Get current file path
+        const editorWidget = this.editorManager.currentEditor;
+        const fileUri = editorWidget?.getResourceUri();
+        const relativePath = fileUri ? this.getRelativePath(fileUri) : '';
+
+        // Call API with typing effect callback
+        const result = await this.aiService.submitFeedback(relativePath, feedback, this.handlePartialResponse);
+
+        // Clear processing state
+        this.isProcessingFeedback = false;
+
+        if (result.error) {
+            console.log("Feedback error: " + result.error);
+            this.feedbackGiven = true;
+            this.showFeedbackThankYou = true;
+            this.isProfessorResponse = false;
+        } else {
+            console.log('Feedback submitted successfully');
+
+            // If API returned an improved response (>20 chars), replace the AI response
+            if (result.data && result.data.length > 20) {
+                this.flushTypingQueue(); // Flush any remaining characters in typing queue
+                this.aiResponse = result.data; // Set final complete response
+                this.feedbackGiven = false; // Reset so feedback buttons show again
+                this.showFeedbackThankYou = false;
+                this.isProfessorResponse = true; // Mark as professor response
+            } else {
+                // Short response or no data - just show thank you
+                this.feedbackGiven = true;
+                this.showFeedbackThankYou = true;
+                this.isProfessorResponse = false;
+            }
+        }
+
+        this.update();
+    }
+
+    private async handleHelpButtonClick(topicId: string) {
+        console.log(`AI Assistant: User needs help with - ${topicId}`);
+
+        if (topicId === 'compile-error') {
             await this.handleCompileError();
-        } else if (topic === 'Program output is wrong') {
+        } else if (topicId === 'wrong-output') {
             await this.handleOutputWrong();
-        } else if (topic === 'Program is crashing') {
+        } else if (topicId === 'crashing') {
             await this.handleProgramCrash();
-        } else if (topic === 'Tests are failing') {
+        } else if (topicId === 'tests-failing') {
             await this.handleTestsFailing();
         } else {
-            // TODO: Implement other topics
+            // Unknown topic ID
             this.errorMessage = 'This feature is not yet implemented.';
             this.update();
         }
@@ -414,7 +1110,7 @@ export class AiAsistentWidget extends ReactWidget {
             // Step 1: Get current editor
             const editorWidget = this.editorManager.currentEditor;
             if (!editorWidget) {
-                this.errorMessage = 'No file is currently opened in the editor.';
+                this.errorMessage = t(this.language, 'noFileOpen');
                 this.update();
                 return;
             }
@@ -422,7 +1118,7 @@ export class AiAsistentWidget extends ReactWidget {
             // Step 2: Get file path and read contents
             const fileUri = editorWidget.getResourceUri();
             if (!fileUri) {
-                this.errorMessage = 'Could not determine the file path.';
+                this.errorMessage = t(this.language, 'noFilePath');
                 this.update();
                 return;
             }
@@ -431,14 +1127,28 @@ export class AiAsistentWidget extends ReactWidget {
             const fileContent = await this.fileService.read(fileUri);
             this.currentCode = fileContent.value;
 
+            // Step 2.5: Read task specification if available
+            this.currentTask = await this.getTaskSpecification(fileUri);
+
             // Step 3: Try to get terminal output (attempt to find run task terminal)
-            const terminalOutput = await this.tryGetTerminalOutput();
+            // Need to get the workspace-relative path for terminal title matching
+            const workspaceRoot = this.workspaceService.workspace?.resource;
+            const fileUriString = fileUri.toString();
+            const workspaceRelativePath = workspaceRoot
+                ? fileUriString.slice(workspaceRoot.toString().length)
+                : fileUriString;
+
+            const terminalOutput = await this.tryGetTerminalOutput(workspaceRelativePath);
             if (terminalOutput) {
                 this.programOutput = terminalOutput;
             }
 
-            // Show the input form
-            this.outputWrongStep = 1;
+            // Show instructions if needed, otherwise go directly to input form
+            if (this.showInstructions) {
+                this.outputWrongStep = 1; // Show instructions
+            } else {
+                this.outputWrongStep = 2; // Skip to input form
+            }
             this.update();
 
         } catch (error) {
@@ -448,67 +1158,210 @@ export class AiAsistentWidget extends ReactWidget {
         }
     }
 
-    private async tryGetTerminalOutput(): Promise<string | null> {
+    private async tryGetTerminalOutput(filePath: string): Promise<string | null> {
         try {
-            // Try to find terminal widget with "Run" in title
+            // Construct the exact terminal title: "Task: Run /path/to/file.c"
+            const exactTitle = `Task: Run ${filePath}`;
+            console.log(`AI Assistant: Looking for terminal with exact title: "${exactTitle}"`);
+
             const terminals = this.terminalService.all;
+            console.log(`AI Assistant: Found ${terminals.length} terminal(s) total`);
+
+            // First pass: Try exact match
+            for (const terminal of terminals) {
+                const title = terminal.title.label;
+                console.log(`AI Assistant: Checking terminal: "${title}"`);
+                if (title === exactTitle) {
+                    console.log('AI Assistant: ✓ Found exact match terminal:', title);
+                    const output = this.extractTerminalOutput(terminal);
+                    if (output !== null) {
+                        return output;
+                    }
+                }
+            }
+
+            console.log('AI Assistant: No exact match found, trying partial match...');
+
+            // Second pass: Fallback to partial match if exact match not found
             for (const terminal of terminals) {
                 const title = terminal.title.label.toLowerCase();
                 if (title.includes('run') || title.includes('task')) {
-                    // Terminal widgets don't have a direct API to get buffer content
-                    // This would require accessing internal terminal implementation
-                    // For now, we'll return null and let user paste manually
-                    console.log('Found run terminal:', terminal.title.label);
-                    return null;
+                    console.log('AI Assistant: Found partial match terminal:', terminal.title.label);
+                    const output = this.extractTerminalOutput(terminal);
+                    if (output !== null) {
+                        return output;
+                    }
                 }
             }
+
+            console.log('AI Assistant: No run terminal found');
             return null;
         } catch (error) {
-            console.warn('Could not access terminal output:', error);
+            console.warn('AI Assistant: Could not access terminal output:', error);
             return null;
         }
     }
 
-    private async submitOutputWrongRequest() {
+    private extractTerminalOutput(terminal: any): string | null {
+        try {
+            // Use the terminal buffer API to get output
+            const buffer = terminal.buffer;
+            if (!buffer) {
+                console.warn('AI Assistant: Terminal has no buffer');
+                return null;
+            }
+
+            const lineCount = buffer.length;
+            if (lineCount === 0) {
+                console.log('AI Assistant: Terminal buffer is empty');
+                return null;
+            }
+
+            // Get last 100 lines (or all if fewer)
+            const linesToRead = Math.min(100, lineCount);
+            const startLine = Math.max(0, lineCount - linesToRead);
+            const lines = buffer.getLines(startLine, linesToRead);
+
+            // Reverse the lines to fix the reversed order issue
+            lines.reverse();
+
+            // Join lines and strip ANSI escape codes
+            const output = lines.join('\n');
+            const cleanedOutput = this.aiService.stripAnsiCodes(output);
+
+            console.log(`AI Assistant: Retrieved ${lines.length} lines from terminal buffer (reversed)`);
+            return cleanedOutput;
+        } catch (error) {
+            console.warn('AI Assistant: Error extracting terminal output:', error);
+            return null;
+        }
+    }
+
+    private async submitOutputWrongRequest(action: string = 'output') {
+        // Validation
+        const validation = this.aiService.validateOutputInputs(
+            this.programOutput,
+            this.expectedOutput
+        );
+
+        if (!validation.valid) {
+            if (validation.errorMessage) {
+                this.errorMessage = t(this.language, validation.errorMessage as keyof Translations);
+                this.outputWrongStep = 3;
+            } else if (validation.showWarning === 'whitespace') {
+                this.showWhitespaceWarning = true;
+                this.outputWrongStep = 0;
+            }
+            this.update();
+            return;
+        }
+
         try {
             this.isProcessing = true;
             this.outputWrongStep = 0;
             this.errorMessage = '';
+            this.clearTypingState();
             this.aiResponse = '';
+            this.isProfessorResponse = false;
             this.update();
 
-            // Call API
-            const formData = new FormData();
-            formData.append('action', 'output');
-            formData.append('path', this.currentPath);
-            formData.append('code', this.currentCode);
-            formData.append('input', this.userInput);
-            formData.append('output', this.programOutput);
-            formData.append('expected', this.expectedOutput);
+            const result = await this.aiService.submitOutputRequest(
+                action as 'output' | 'output_whitespace',
+                this.currentPath,
+                this.currentCode,
+                this.userInput,
+                this.programOutput,
+                this.expectedOutput,
+                this.currentTask,
+                this.handlePartialResponse
+            );
 
-            const response = await fetch('/api/v1/ai/asistent', {
-                method: 'POST',
-                credentials: 'include',
-                body: formData
-            });
-
-            if (!response.ok) {
-                await this.handleApiError(response);
-                this.isProcessing = false;
-                this.update();
-                return;
-            }
-
-            const data = await response.json();
-
-            if (data.data) {
-                this.aiResponse = data.data;
+            if (result.error) {
+                if (result.error === 'QUOTA_EXCEEDED') {
+                    this.quotaExceeded = true;
+                } else {
+                    this.errorMessage = result.error;
+                }
             } else {
-                this.errorMessage = 'API response did not contain expected data.';
+                this.flushTypingQueue();
+                this.aiResponse = result.data || '';
             }
-
         } catch (error) {
             console.error('AI Assistant: Error submitting output wrong request', error);
+            this.errorMessage = `Unexpected error: ${error}`;
+        } finally {
+            this.isProcessing = false;
+            this.update();
+        }
+    }
+
+    private async submitCompileRequest(action: string, relativePath: string, code: string, gccOutput: string, task?: string) {
+        try {
+            this.isProcessing = true;
+            this.errorMessage = '';
+            this.clearTypingState();
+            this.aiResponse = '';
+            this.isProfessorResponse = false;
+            this.update();
+
+            const result = await this.aiService.submitCompileRequest(
+                action as 'compile' | 'compile_warn',
+                relativePath,
+                code,
+                gccOutput,
+                task,
+                this.handlePartialResponse
+            );
+
+            if (result.error) {
+                if (result.error === 'QUOTA_EXCEEDED') {
+                    this.quotaExceeded = true;
+                } else {
+                    this.errorMessage = result.error;
+                }
+            } else {
+                this.flushTypingQueue();
+                this.aiResponse = result.data || '';
+            }
+        } catch (error) {
+            console.error('AI Assistant: Error submitting compile request', error);
+            this.errorMessage = `Unexpected error: ${error}`;
+        } finally {
+            this.isProcessing = false;
+            this.update();
+        }
+    }
+
+    private async submitCrashRequest(action: string, relativePath: string, code: string, asanOutput: string, task?: string) {
+        try {
+            this.isProcessing = true;
+            this.errorMessage = '';
+            this.clearTypingState();
+            this.aiResponse = '';
+            this.isProfessorResponse = false;
+            this.update();
+
+            const result = await this.aiService.submitCrashRequest(
+                'crash',
+                relativePath,
+                code,
+                asanOutput,
+                task,
+                this.handlePartialResponse
+            );
+
+            if (result.error) {
+                if (result.error === 'QUOTA_EXCEEDED') {
+                    this.quotaExceeded = true;
+                } else {
+                    this.errorMessage = result.error;
+                }
+            } else {
+                this.flushTypingQueue();
+                this.aiResponse = result.data || '';
+            }
+        } catch (error) {
+            console.error('AI Assistant: Error submitting crash request', error);
             this.errorMessage = `Unexpected error: ${error}`;
         } finally {
             this.isProcessing = false;
@@ -520,13 +1373,15 @@ export class AiAsistentWidget extends ReactWidget {
         try {
             this.isProcessing = true;
             this.errorMessage = '';
+            this.clearTypingState();
             this.aiResponse = '';
+            this.isProfessorResponse = false;
             this.update();
 
             // Step 1: Get current editor
             const editorWidget = this.editorManager.currentEditor;
             if (!editorWidget) {
-                this.errorMessage = 'No file is currently opened in the editor.';
+                this.errorMessage = t(this.language, 'noFileOpen');
                 this.isProcessing = false;
                 this.update();
                 return;
@@ -535,7 +1390,7 @@ export class AiAsistentWidget extends ReactWidget {
             // Step 2: Get file path and read contents
             const fileUri = editorWidget.getResourceUri();
             if (!fileUri) {
-                this.errorMessage = 'Could not determine the file path.';
+                this.errorMessage = t(this.language, 'noFilePath');
                 this.isProcessing = false;
                 this.update();
                 return;
@@ -545,47 +1400,54 @@ export class AiAsistentWidget extends ReactWidget {
             const fileContent = await this.fileService.read(fileUri);
             const code = fileContent.value;
 
+            // Step 2.5: Read task specification if available
+            const task = await this.getTaskSpecification(fileUri);
+
             // Step 3: Try to read .asan.out file from same directory
             const fileDir = fileUri.parent;
             const asanOutUri = new URI(fileDir.toString() + '/.asan.out');
 
             let asanOutput: string = '';
+            let asanFileFound = false;
             try {
                 const asanOutContent = await this.fileService.read(asanOutUri);
-                asanOutput = asanOutContent.value;
+                asanOutput = asanOutContent.value.trim();
+                asanFileFound = true;
                 console.log('AI Assistant: Found .asan.out file');
             } catch (error) {
-                console.log('AI Assistant: No .asan.out file found, proceeding without it');
-                // Continue with empty asan output
+                console.log('AI Assistant: No .asan.out file found');
             }
 
-            // Step 4: Call API
-            const formData = new FormData();
-            formData.append('action', 'crash');
-            formData.append('path', relativePath);
-            formData.append('code', code);
-            formData.append('asan', asanOutput);
-
-            const response = await fetch('/api/v1/ai/asistent', {
-                method: 'POST',
-                credentials: 'include',
-                body: formData
-            });
-
-            if (!response.ok) {
-                await this.handleApiError(response);
+            // Step 4: Check if .asan.out is missing or empty - show warning
+            if (!asanFileFound || asanOutput === '') {
+                console.log('AI Assistant: .asan.out missing or empty, showing warning');
+                this.showCrashWarning = true;
+                this.crashCode = code;
+                this.crashPath = relativePath;
+                this.crashTask = task;
                 this.isProcessing = false;
                 this.update();
                 return;
             }
 
-            const data = await response.json();
+            // Step 5: Validate crash inputs (timestamp check)
+            const validation = await this.aiService.validateCrashInputs(
+                fileUri,
+                asanOutUri,
+                asanOutput,
+                asanFileFound
+            );
 
-            if (data.data) {
-                this.aiResponse = data.data;
-            } else {
-                this.errorMessage = 'API response did not contain expected data.';
+            if (!validation.valid && validation.showWarning === 'stale-asan') {
+                this.warningContext = { ...validation.context, relativePath, code, asanOutput, task };
+                this.showStaleAsanWarning = true;
+                this.isProcessing = false;
+                this.update();
+                return;
             }
+
+            // Step 6: .asan.out exists, has content, and is fresh - proceed with analysis
+            await this.submitCrashRequest('crash', relativePath, code, asanOutput, task);
 
         } catch (error) {
             console.error('AI Assistant: Error handling program crash', error);
@@ -600,13 +1462,15 @@ export class AiAsistentWidget extends ReactWidget {
         try {
             this.isProcessing = true;
             this.errorMessage = '';
+            this.clearTypingState();
             this.aiResponse = '';
+            this.isProfessorResponse = false;
             this.update();
 
             // Step 1: Get current editor
             const editorWidget = this.editorManager.currentEditor;
             if (!editorWidget) {
-                this.errorMessage = 'No file is currently opened in the editor.';
+                this.errorMessage = t(this.language, 'noFileOpen');
                 this.isProcessing = false;
                 this.update();
                 return;
@@ -615,7 +1479,7 @@ export class AiAsistentWidget extends ReactWidget {
             // Step 2: Get file path and read contents
             const fileUri = editorWidget.getResourceUri();
             if (!fileUri) {
-                this.errorMessage = 'Could not determine the file path.';
+                this.errorMessage = t(this.language, 'noFilePath');
                 this.isProcessing = false;
                 this.update();
                 return;
@@ -624,6 +1488,9 @@ export class AiAsistentWidget extends ReactWidget {
             const relativePath = this.getRelativePath(fileUri);
             const fileContent = await this.fileService.read(fileUri);
             const code = fileContent.value;
+
+            // Step 2.5: Read task specification if available
+            const task = await this.getTaskSpecification(fileUri);
 
             // Step 3: Read .autotest3 file
             const fileDir = fileUri.parent;
@@ -634,7 +1501,7 @@ export class AiAsistentWidget extends ReactWidget {
                 const autotestFile = await this.fileService.read(autotestUri);
                 autotestContent = autotestFile.value;
             } catch (error) {
-                this.errorMessage = 'Tests not found.';
+                this.errorMessage = t(this.language, 'testsNotFound');
                 this.isProcessing = false;
                 this.update();
                 return;
@@ -648,54 +1515,35 @@ export class AiAsistentWidget extends ReactWidget {
                 const atResultFile = await this.fileService.read(atResultUri);
                 atResultContent = atResultFile.value;
             } catch (error) {
-                this.errorMessage = 'Test results not found, please retest the project and ask again.';
+                this.errorMessage = t(this.language, 'testResultsNotFound');
                 this.isProcessing = false;
                 this.update();
                 return;
             }
 
             // Step 5: Call API
-            const formData = new FormData();
-            formData.append('action', 'autotest');
-            formData.append('path', relativePath);
-            formData.append('code', code);
-            formData.append('autotest', autotestContent);
-            formData.append('result', atResultContent);
+            const result = await this.aiService.submitAutotestRequest(
+                relativePath,
+                code,
+                autotestContent,
+                atResultContent,
+                task,
+                this.handlePartialResponse
+            );
 
-            const response = await fetch('/api/v1/ai/asistent', {
-                method: 'POST',
-                credentials: 'include',
-                body: formData
-            });
-
-            if (!response.ok) {
-                await this.handleApiError(response);
-                this.isProcessing = false;
-                this.update();
-                return;
-            }
-
-            const data = await response.json();
-
-            // Handle special cases
-            if (data.message === 'main function not found') {
-                this.errorMessage = 'Testing function couldn\'t locate a main function. Please check if a nonstandard main declaration is used.';
-                this.isProcessing = false;
-                this.update();
-                return;
-            }
-
-            if (data.message === 'No failed test was found') {
-                this.errorMessage = 'All tests were successful - there\'s nothing to help with!';
-                this.isProcessing = false;
-                this.update();
-                return;
-            }
-
-            if (data.data) {
-                this.aiResponse = data.data;
+            if (result.error) {
+                if (result.error === 'QUOTA_EXCEEDED') {
+                    this.quotaExceeded = true;
+                } else if (result.error === 'main function not found') {
+                    this.errorMessage = t(this.language, 'mainNotFound');
+                } else if (result.error === 'No failed test was found') {
+                    this.errorMessage = t(this.language, 'noFailedTests');
+                } else {
+                    this.errorMessage = result.error;
+                }
             } else {
-                this.errorMessage = 'API response did not contain expected data.';
+                this.flushTypingQueue();
+                this.aiResponse = result.data || '';
             }
 
         } catch (error) {
@@ -711,13 +1559,15 @@ export class AiAsistentWidget extends ReactWidget {
         try {
             this.isProcessing = true;
             this.errorMessage = '';
+            this.clearTypingState();
             this.aiResponse = '';
+            this.isProfessorResponse = false;
             this.update();
 
             // Step 1: Get current editor
             const editorWidget = this.editorManager.currentEditor;
             if (!editorWidget) {
-                this.errorMessage = 'No file is currently opened in the editor.';
+                this.errorMessage = t(this.language, 'noFileOpen');
                 this.isProcessing = false;
                 this.update();
                 return;
@@ -726,7 +1576,7 @@ export class AiAsistentWidget extends ReactWidget {
             // Step 2: Get file path
             const fileUri = editorWidget.getResourceUri();
             if (!fileUri) {
-                this.errorMessage = 'Could not determine the file path.';
+                this.errorMessage = t(this.language, 'noFilePath');
                 this.isProcessing = false;
                 this.update();
                 return;
@@ -748,53 +1598,52 @@ export class AiAsistentWidget extends ReactWidget {
             const fileContent = await this.fileService.read(fileUri);
             const code = fileContent.value;
 
+            // Step 3.5: Read task specification if available
+            const task = await this.getTaskSpecification(fileUri);
+
             // Step 4: Read .gcc.out file
             const fileDir = fileUri.parent;
             const gccOutUri = new URI(fileDir.toString() + '/.gcc.out');
 
             let gccOutput: string;
+            let gccFileExists = false;
             try {
                 const gccOutContent = await this.fileService.read(gccOutUri);
                 gccOutput = gccOutContent.value;
+                gccFileExists = true;
             } catch (error) {
-                this.errorMessage = 'No .gcc.out file found in the same directory as the current file.';
+                gccOutput = '';
+            }
+
+            // Validate compile inputs
+            const validation = await this.aiService.validateCompileInputs(
+                fileUri,
+                gccOutUri,
+                gccOutput,
+                gccFileExists
+            );
+
+            if (!validation.valid) {
+                if (validation.errorMessage) {
+                    this.errorMessage = t(this.language, validation.errorMessage as keyof Translations);
+                } else if (validation.showWarning === 'compile-warn') {
+                    this.warningContext = { relativePath, code, gccOutput, task };
+                    this.showCompileWarnWarning = true;
+                } else if (validation.showWarning === 'stale-gcc') {
+                    this.warningContext = { ...validation.context, relativePath, code, gccOutput, task };
+                    this.showStaleGccWarning = true;
+                }
                 this.isProcessing = false;
                 this.update();
                 return;
             }
 
-            // Step 5: Call API
-            const formData = new FormData();
-            formData.append('action', 'compile');
-            formData.append('path', relativePath);
-            formData.append('code', code);
-            formData.append('output', gccOutput);
-
-            const response = await fetch('/api/v1/ai/asistent', {
-                method: 'POST',
-                credentials: 'include',
-                body: formData
-            });
-
-            if (!response.ok) {
-                await this.handleApiError(response);
-                this.isProcessing = false;
-                this.update();
-                return;
-            }
-
-            const data = await response.json();
-
-            if (data.data) {
-                this.aiResponse = data.data;
-            } else {
-                this.errorMessage = 'API response did not contain expected data.';
-            }
+            // All checks passed, proceed with compilation error analysis
+            await this.submitCompileRequest('compile', relativePath, code, gccOutput, task);
 
         } catch (error) {
             console.error('AI Assistant: Error handling compile error', error);
             this.errorMessage = `Unexpected error: ${error}`;
-        } finally {
             this.isProcessing = false;
             this.update();
         }
