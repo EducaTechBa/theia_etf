@@ -81,10 +81,12 @@ export class Autotester {
 
         const formData = new FormData();
         formData.append('program', content);
-        await fetch(url, {
+        const res = await fetch(url, {
             method: 'POST',
             body: formData
         });
+        const data = await res.json();
+        return data;
     }
 
     private async traverse(directory: AssignmentDirectory, func: (dir: BinaryAssignmentFile) => void): Promise<void> {
@@ -98,6 +100,12 @@ export class Autotester {
         const url = this.makeURL('getResult', `id=${programID}`);
         const res = await fetch(url);
         const data = await res.json();
+        
+        // Check for API-level errors (like unknown program ID)
+        if (!data.success || !data.data) {
+            console.log(`getResults failed for program ${programID}: ${data.message || 'Unknown error'}`);
+            return undefined;
+        }
 
         return data.data;
     }

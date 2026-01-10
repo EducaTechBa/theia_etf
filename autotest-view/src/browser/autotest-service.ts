@@ -92,6 +92,7 @@ export enum AutotestRunStatus {
     ERROR_OPENING_DIRECTORY = 3,
     AUTOTEST_FILE_CORRUPT = 4,
     ERROR_REACHING_SERVER = 5,
+    ERROR_GETTING_RESULT = 6,
 }
 
 export enum AutotestCancelStatus {
@@ -231,15 +232,24 @@ export class AutotestService {
             program = await this.createProgram(undefined, taskID, programName, nonSilentAutotests.length, dirURI, isUserInvoked);
         }
 
-        this.state.programs[dirURI] = program;
-        program.isUserInvoked = isUserInvoked;
-
-        console.log(`Program ID: ${program.id}`);
-
         try {
             const dir = await this.loadAssignmentDirectory(dirURI);
             // console.log(`Directories are: ${JSON.stringify(dir)}`);
-            await this.autotester.setProgramFiles(program.id, dir);
+            const programFilesStatus = await this.autotester.setProgramFiles(program.id, dir);
+            if (!programFilesStatus.success) {
+                console.log("setProgramFiles error: " + programFilesStatus.message);
+                program = await this.createProgram(undefined, taskID, programName, nonSilentAutotests.length, dirURI, isUserInvoked);
+                const programFilesStatusRetry = await this.autotester.setProgramFiles(program.id, dir);
+                if (!programFilesStatusRetry.success) {
+                    console.log("Another setProgramFiles error, giving up: " + programFilesStatusRetry.message);
+                    
+                    await this.deleteAutotestResultsFile(dirURI);// If it was created before
+                    return {
+                        success: false,
+                        status: AutotestRunStatus.ERROR_GETTING_RESULT
+                    };
+                }
+            }
             console.log("Source files are set...");
         } catch (err) {
             console.log(err);
@@ -249,8 +259,23 @@ export class AutotestService {
             };
         }
 
+        this.state.programs[dirURI] = program;
+        program.isUserInvoked = isUserInvoked;
+
+        console.log(`Program ID: ${program.id}`);
+
         await this.writeAutotestResultsFile(dirURI, `{ "program_id": ${program.id}, "task_id": ${taskID}, "status": 1 }`);
-        this.getResults(dirURI);
+        try {
+            this.getResults(dirURI);
+        } catch (err) {
+            await this.deleteAutotestResultsFile(dirURI);
+            delete this.state.programs[dirURI];
+            return {
+                success: false,
+                status: AutotestRunStatus.ERROR_GETTING_RESULT
+            };
+        }
+            
 
         return {
             success: true,
@@ -344,6 +369,10 @@ export class AutotestService {
         const wasCanceled = (program.status === ProgramStatus.PROGRAM_CANCELED);
 
         const responseResult = await this.autotester.getResults(program.id);
+        if (responseResult === undefined) {
+            console.log("Failed to get program results");
+            throw Error(`Failed to get program results`);
+        }
         if (wasCanceled) responseResult.status = 9;
         program.rawResults = responseResult;
         program.status = this.integerToProgramStatus(responseResult.status);
@@ -450,6 +479,13 @@ export class AutotestService {
             await this.fileService.delete(new URI(uri));
         } catch (_) { }
         return await this.fileService.create(new URI(uri), content);
+    }
+
+    private async deleteAutotestResultsFile(dirURI: string) {
+        const uri = `${dirURI}/${this.AUTOTEST_RESULTS_FILENAME}`;
+        try {
+            await this.fileService.delete(new URI(uri));
+        } catch (_) { }
     }
 
     public async hasAutotestsDefined(dirURI: string): Promise<boolean> {

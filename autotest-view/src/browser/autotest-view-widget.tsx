@@ -252,6 +252,10 @@ export class AutotestViewWidget extends ReactWidget {
                     message = "Already running tests...";
                 } else if (runInfo.status === AutotestRunStatus.AUTOTEST_FILE_CORRUPT) {
                     message = "Autotests are corrupt. Please contact your supervisor!";
+                } else if (runInfo.status === AutotestRunStatus.ERROR_REACHING_SERVER) {
+                    message = "Network error attempting to run tests.";
+                } else if (runInfo.status === AutotestRunStatus.ERROR_GETTING_RESULT) {
+                    message = "There was an internal server error. You can retry, if the problem persists contact the administrator";
                 }
 
                 this.setState(state => {
