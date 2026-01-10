@@ -61,9 +61,7 @@ export class TaskRunner {
     @postConstruct()
     // @ts-ignore
     private async init() {
-        const path = `${this.workspaceService.workspace?.resource.toString()}${this.RELATIVE_TASK_CONFIG_JSON_PATH}`;
-        const jsonURI = new URI(path);
-        this.directoryTasks = await this.loadDirectoryTaskConfigFromJson(jsonURI);
+        await this.ensureDirectoryTasksLoaded();
 
         // Subscribe to task events
         // Note: We also call handleTaskStarted directly in runTask() for immediate response
@@ -82,26 +80,68 @@ export class TaskRunner {
         });
     }
 
+    /**
+     * Ensures that directory tasks are loaded. This method can be called multiple times safely.
+     * It will only load the configuration if it hasn't been loaded yet or if it's empty.
+     */
+    private async ensureDirectoryTasksLoaded(): Promise<void> {
+        // If we already have tasks loaded (non-empty object), no need to reload
+        if (this.directoryTasks && Object.keys(this.directoryTasks).length > 0) {
+            console.log('Directory tasks already loaded, skipping reload');
+            return;
+        }
+
+        const workspaceRoot = this.workspaceService.workspace?.resource;
+        if (!workspaceRoot) {
+            console.error('TaskRunner: workspace not available yet, cannot load task configuration');
+            return;
+        }
+
+        const path = `${workspaceRoot.toString()}${this.RELATIVE_TASK_CONFIG_JSON_PATH}`;
+        const jsonURI = new URI(path);
+
+        console.log(`TaskRunner: Loading task configuration from: ${path}`);
+        this.directoryTasks = await this.loadDirectoryTaskConfigFromJson(jsonURI);
+
+        if (Object.keys(this.directoryTasks).length === 0) {
+            console.warn('TaskRunner: Loaded task configuration is empty');
+        } else {
+            console.log('TaskRunner: Successfully loaded task configuration:', this.directoryTasks);
+        }
+    }
+
     private async loadDirectoryTaskConfigFromJson(fileURI: URI): Promise<DirectoryTasks> {
         try {
             const fileContent = await this.fileService.read(fileURI);
             const directoryTasks = JSON.parse(fileContent.value) as DirectoryTasks;
+            console.log(`TaskRunner: Parsed task configuration from ${fileURI.toString()}`);
             return directoryTasks;
         } catch (err) {
-            // TODO: Show error message via messageService...
-            console.log(`Could not load TaskDirectoryConfiguration: ${err}`);
+            console.error(`TaskRunner: Could not load task configuration from ${fileURI.toString()}: ${err}`);
             return {};
         }
     }
 
-    private createTaskConfigration(label: string, command: string, isBackground?: boolean, dependsOn?: string): TaskConfiguration {
+    /**
+     * Substitutes common task variables with their actual values.
+     * Supports: ${file}, ${fileDirname}, ${fileBasename}, ${fileBasenameNoExtension}
+     */
+    private substituteVariables(command: string, file: string, fileDirname: string, fileBasename: string, fileBasenameNoExtension: string): string {
+        return command
+            .replace(/\$\{file\}/g, file)
+            .replace(/\$\{fileDirname\}/g, fileDirname)
+            .replace(/\$\{fileBasename\}/g, fileBasename)
+            .replace(/\$\{fileBasenameNoExtension\}/g, fileBasenameNoExtension);
+    }
+
+    private createTaskConfigration(label: string, command: string, isBackground?: boolean, dependsOn?: string, cwd?: string): TaskConfiguration {
         return {
             label,
             _scope: TaskScope.Workspace,
             type: 'shell',
             command,
             options: {
-                cwd: "${fileDirname}"
+                cwd: cwd || "${fileDirname}"
             },
             presentation: {
                 clear: true,
@@ -145,6 +185,9 @@ export class TaskRunner {
     }
 
     public async runTask(fileURI: URI) {
+        // Ensure task configuration is loaded (lazy loading in case init() failed)
+        await this.ensureDirectoryTasksLoaded();
+
         // Store the current file URI for ASAN watcher
         this.currentFileURI = fileURI;
 
@@ -152,17 +195,27 @@ export class TaskRunner {
 
         const { build, run } = this.getTaskCommandsByPath(inWorkspacePath);
 
+        // Prepare variable substitutions
+        const file = fileURI.path.toString();
+        const fileDirname = fileURI.parent.path.toString();
+        const fileBasename = fileURI.path.base;
+        const fileBasenameNoExtension = fileURI.path.name;
+
+        // Substitute variables in commands
+        const substitutedBuild = build ? this.substituteVariables(build, file, fileDirname, fileBasename, fileBasenameNoExtension) : undefined;
+        const substitutedRun = this.substituteVariables(run, file, fileDirname, fileBasename, fileBasenameNoExtension);
+
         const buildTaskLabel = `Build ${inWorkspacePath}`;
         const runTaskLabel = `Run ${inWorkspacePath}`;
 
-        if (build) {
-            const buildTask = this.createTaskConfigration(buildTaskLabel, build, true);
+        if (substitutedBuild) {
+            const buildTask = this.createTaskConfigration(buildTaskLabel, substitutedBuild, true, fileDirname);
             await this.taskService.runTask(buildTask);
         }
 
-        const dependsOn = build ? buildTaskLabel : undefined;
+        const dependsOn = substitutedBuild ? buildTaskLabel : undefined;
 
-        const runTask = this.createTaskConfigration(runTaskLabel, run, false, dependsOn);
+        const runTask = this.createTaskConfigration(runTaskLabel, substitutedRun, false, dependsOn, fileDirname);
         const taskInfo = await this.taskService.runTask(runTask);
 
         // Call handleTaskStarted directly since events might have already fired
@@ -273,8 +326,12 @@ export class TaskRunner {
     private async checkAsanFile(asanFileURI: URI) {
         try {
             const fileContent = await this.fileService.read(asanFileURI);
-            if (fileContent.value.includes('AddressSanitizer:DEADLYSIGNAL')) {
-                this.messageService.info('Your program has crashed. Use debugger to find out why.');
+            if (fileContent.value.includes('AddressSanitizer:DEADLYSIGNAL') || fileContent.value.includes('ABORTING')) {
+                this.messageService.warn('Your program has crashed. Use debugger to find out why.');
+            } else if (fileContent.value.includes('ERROR: AddressSanitizer')) {
+                this.messageService.warn('Your program contains a memory error (leak, out-of-bounds access etc).');
+            } else if (fileContent.value.length > 15 && !fileContent.value.includes('AddressSanitizer')) {
+                this.messageService.warn('There was a problem running your file. Contact the system administrator immediately.');
             }
         } catch (err) {
             // File doesn't exist or can't be read - this is normal, silently ignore

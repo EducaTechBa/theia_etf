@@ -49,6 +49,15 @@ export class TopBarWidget extends ReactWidget {
         this.title.closable = true;
         this.title.iconClass = 'fa fa-window-maximize';
 
+        // Initialize with current active editor if one exists
+        const currentEditor = this.editorManager.currentEditor;
+        if (currentEditor) {
+            console.log('TopBar: Initializing with current active editor:', currentEditor.getResourceUri()?.toString());
+            this.handleEditorSwitch(currentEditor);
+        } else {
+            console.log('TopBar: No active editor at initialization');
+        }
+
         this.editorManager.onCreated(editorWidget => this.handleEditorSwitch(editorWidget));
         this.editorManager.onActiveEditorChanged(editorWidget => this.handleEditorSwitch(editorWidget));
 
@@ -118,6 +127,9 @@ export class TopBarWidget extends ReactWidget {
     private async handleRunButtonClick() {
         if (this.editorFileURI) {
             this.taskRunner.runTask(this.editorFileURI);
+        } else {
+            console.warn('TopBar: Run button clicked but no file is open');
+            this.messageService.warn('Please open a file to run');
         }
     }
 
