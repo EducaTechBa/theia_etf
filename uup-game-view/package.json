@@ -5,9 +5,9 @@
     "theia-extension"
   ],
   "version": "1.1.1",
-  "description": "Game",
+  "description": "UUPGame - Gamified learning C programming",
   
-  "author": "Mirza, Vedran",
+  "author": "Mirza Mesihović (1.0.x), Vedran Ljubović",
   
   "files": [
     "lib",

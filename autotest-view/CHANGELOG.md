@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Handle unknown program ID (e.g. user never finished testing but stale cached data on backend was cleaned)
+- Fix error when attempting to view test results after IDE reload
 
 
 ## [1.2.0] - 2025-11-16

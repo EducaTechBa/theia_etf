@@ -4,9 +4,9 @@
     "theia-extension"
   ],
   "version": "1.2.0",
-  "description": "&#34;A",
+  "description": "List of predefined course assignments with files",
   
-  "author": "Rijad,Vedran",
+  "author": "Rijad Fejzić (1.0.x), Vedran Ljubović",
   
   "files": [
     "lib",

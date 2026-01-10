@@ -3,9 +3,9 @@
   "keywords": [
     "theia-extension"
   ],
-  "version": "1.2.0",
-  "description": "Desc",
-  "author": "Rijad,Vedran",
+  "version": "1.2.1",
+  "description": "A small panel for running programs on the top that also does a lot of other stuff",
+  "author": "Rijad Fejzić (1.0.x), Vedran Ljubović",
   "files": [
     "lib",
     "src"

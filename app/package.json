@@ -27,12 +27,12 @@
     "@theia/variable-resolver": "1.66.2",
     "@theia/vsx-registry": "1.66.2",
     "@theia/workspace": "1.66.2",
-    "ai-asistent": "0.0.0",
+    "ai-asistent": "1.1.0",
     "assignments-view": "1.2.0",
     "autotest-view": "1.2.1",
     "react-select": "^3.1.0",
-    "top-bar": "0.0.0",
-    "uup-game-view": "0.0.0"
+    "top-bar": "1.2.1",
+    "uup-game-view": "1.1.1"
   },
   "devDependencies": {
     "@theia/cli": "latest"

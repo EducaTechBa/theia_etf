@@ -4,8 +4,8 @@
     "theia-extension"
   ],
   "version": "1.2.1",
-  "description": "Desct",
-  "author": "Mirza,Rijad,Tarik,Vedran",
+  "description": "UI for testing programs with Autotester",
+  "author": "Rijad Fejzić, Tarik Sijerčić, Mirza Mesihović (v1.0.x), Vedran Ljubović (v1.1.0+)",
   "files": [
     "lib",
     "src"
@@ -17,7 +17,7 @@
     "@theia/editor": "1.66.2",
     "@types/jszip": "^3.4.1",
     "jszip": "^3.5.0",
-    "top-bar": "1.2.0"
+    "top-bar": "1.2.1"
   },
   "devDependencies": {
     "@types/glob": "^8.1.0",
