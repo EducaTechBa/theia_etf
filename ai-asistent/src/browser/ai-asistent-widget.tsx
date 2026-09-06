@@ -834,6 +834,12 @@ export class AiAsistentWidget extends ReactWidget {
     }
 
     private async proceedWithCrashAnalysis() {
+        // Guard against double-clicks
+        if (this.isProcessing) {
+            console.log('AI Assistant: Ignoring proceed click - already processing');
+            return;
+        }
+
         try {
             this.isProcessing = true;
             this.showCrashWarning = false;
@@ -1042,6 +1048,12 @@ export class AiAsistentWidget extends ReactWidget {
     }
 
     private async submitFeedback(feedback: string) {
+        // Guard against double-clicks
+        if (this.isProcessingFeedback) {
+            console.log('AI Assistant: Ignoring feedback click - already processing');
+            return;
+        }
+
         console.log(`AI Assistant: User feedback - ${feedback}`);
 
         // Show processing state
@@ -1088,6 +1100,12 @@ export class AiAsistentWidget extends ReactWidget {
     }
 
     private async handleHelpButtonClick(topicId: string) {
+        // Guard against double-clicks - check synchronously before any async operation
+        if (this.isProcessing) {
+            console.log('AI Assistant: Ignoring click - already processing');
+            return;
+        }
+
         console.log(`AI Assistant: User needs help with - ${topicId}`);
 
         if (topicId === 'compile-error') {
@@ -1238,6 +1256,12 @@ export class AiAsistentWidget extends ReactWidget {
     }
 
     private async submitOutputWrongRequest(action: string = 'output') {
+        // Guard against double-clicks
+        if (this.isProcessing) {
+            console.log('AI Assistant: Ignoring submit click - already processing');
+            return;
+        }
+
         // Validation
         const validation = this.aiService.validateOutputInputs(
             this.programOutput,
@@ -1296,6 +1320,12 @@ export class AiAsistentWidget extends ReactWidget {
     }
 
     private async submitCompileRequest(action: string, relativePath: string, code: string, gccOutput: string, task?: string) {
+        // Guard against double-clicks
+        if (this.isProcessing) {
+            console.log('AI Assistant: Ignoring compile request - already processing');
+            return;
+        }
+
         try {
             this.isProcessing = true;
             this.errorMessage = '';
@@ -1333,6 +1363,12 @@ export class AiAsistentWidget extends ReactWidget {
     }
 
     private async submitCrashRequest(action: string, relativePath: string, code: string, asanOutput: string, task?: string) {
+        // Guard against double-clicks
+        if (this.isProcessing) {
+            console.log('AI Assistant: Ignoring crash request - already processing');
+            return;
+        }
+
         try {
             this.isProcessing = true;
             this.errorMessage = '';
