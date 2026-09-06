@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Hide "Terminal" menu
+- Hide "Terminal" menu (code removed by mistake in previous release)
 - Attempt to fix "No Run task defined" error (it's a race condition so very difficult to reproduce or confirm fixed)
 
 
@@ -27,8 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Disable "Testing" panel (introduced with new Theia by default)
 - Implement Stop button
-- Monitor .asan.out to detect program craching
-- Implement automatic closing of terminal windows to improve performance and memory usage
+- Monitor .asan.out to detect program crashing
+- Implement automatic closing of old terminal windows to improve performance and memory usage
 - Add options "New C File", "New C++ file" etc. to menu to simplify manual task creation
 - Detect failure to reconnect after networking issues and force reload environment (not really tested in production)
 

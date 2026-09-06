@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fix opening subfolders within task (if specified on backend)
-- Fix for new directory structure (having separate subdir for tasks) - this was changed on backend a year ago, not sure how it worked until now
+- Fix for new directory structure (having separate directory for task e.g. UUP_GAME/L1/Z4) - this was changed on backend a year ago, not sure how it worked until now
 
 
 ## [1.1.0] - 2023-10-08

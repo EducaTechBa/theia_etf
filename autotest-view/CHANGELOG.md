@@ -37,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Progressive loading
+- Progressive loading of testing results (tests shown one-by-one)
 - Handle parsing errors
 - Support for .autotest3 file format
 

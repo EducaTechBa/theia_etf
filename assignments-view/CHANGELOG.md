@@ -22,12 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- More robust with poor connection
 - Dialogs to track progress
 
 ### Changed
 
 - Changes to backend API
+- More robust behavior with poor connection
 
 ### Fixed
 
