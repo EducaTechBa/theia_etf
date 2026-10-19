@@ -13,7 +13,8 @@
   "dependencies": {
     "@theia/core": "1.66.2",
     "@theia/workspace": "1.66.2",
-    "@theia/filesystem": "1.66.2"
+    "@theia/filesystem": "1.66.2",
+    "@theia/mini-browser": "1.66.2"
   },
   "devDependencies": {
     "@types/glob": "^8.1.0",

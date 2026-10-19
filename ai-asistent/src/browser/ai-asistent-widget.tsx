@@ -1,10 +1,12 @@
 import * as React from 'react';
 import { injectable, postConstruct, inject } from 'inversify';
+import { Message } from '@lumino/messaging';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { EditorManager } from '@theia/editor/lib/browser';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
 import { TerminalService } from '@theia/terminal/lib/browser/base/terminal-service';
+import { MiniBrowserOpenHandler } from '@theia/mini-browser/lib/browser/mini-browser-open-handler';
 import URI from '@theia/core/lib/common/uri';
 import { comingSoonImage, friendlyAssistantImage, tiredAssistantImage } from './encoded-images';
 import MarkdownIt = require('markdown-it');
@@ -32,6 +34,9 @@ export class AiAsistentWidget extends ReactWidget {
 
     @inject(TerminalService)
     protected readonly terminalService: TerminalService;
+
+    @inject(MiniBrowserOpenHandler)
+    protected readonly miniBrowserOpenHandler: MiniBrowserOpenHandler;
 
     @inject(AIAsistentService)
     protected readonly aiService!: AIAsistentService;
@@ -85,6 +90,10 @@ export class AiAsistentWidget extends ReactWidget {
     private showResponseTypeSelector: boolean = false;
     private pendingResponseAction: ((responseType?: ResponseType) => Promise<void>) | undefined = undefined;
 
+    // Tracks which "screen" was last rendered, so we can scroll to top on real transitions
+    // (button clicks, steps, results arriving) without resetting scroll on every typing-animation tick.
+    private lastScreenKey: string = '';
+
     // Localization
     private language: Language = 'bs'; // Default to Bosnian
 
@@ -106,6 +115,24 @@ export class AiAsistentWidget extends ReactWidget {
         this.language = this.language === 'en' ? 'bs' : 'en';
         this.update();
     }
+
+    /**
+     * Intercepts clicks on links inside the rendered AI response (markdown links and
+     * auto-linkified bare URLs) and opens them in Theia's own mini-browser preview
+     * (central area) instead of navigating the IDE tab away to an external page.
+     */
+    private handleResponseLinkClick = (event: React.MouseEvent<HTMLDivElement>) => {
+        const anchor = (event.target as HTMLElement).closest('a');
+        if (!anchor || !anchor.href) {
+            return;
+        }
+        event.preventDefault();
+        this.miniBrowserOpenHandler.open(MiniBrowserOpenHandler.PREVIEW_URI, {
+            startPage: anchor.href,
+            toolbar: 'show',
+            openFor: 'preview'
+        });
+    };
 
     /**
      * Handler for partial AI response (typing effect)
@@ -216,6 +243,53 @@ export class AiAsistentWidget extends ReactWidget {
         this.pendingResponseAction = undefined;
         if (action) {
             await action(responseType);
+        }
+    }
+
+    /**
+     * Identifies the current "screen" (which step/state is shown), ignoring the growing
+     * aiResponse text itself so per-character typing-animation ticks don't count as transitions.
+     */
+    private computeScreenKey(): string {
+        return JSON.stringify([
+            this.isChecking,
+            this.isAvailable,
+            this.quotaExceeded,
+            this.isProcessing,
+            this.outputWrongStep,
+            this.showCrashWarning,
+            this.showWhitespaceWarning,
+            this.showCompileWarnWarning,
+            this.showStaleGccWarning,
+            this.showStaleAsanWarning,
+            this.showResponseTypeSelector,
+            !!this.aiResponse,
+            !!this.errorMessage,
+            this.isProcessingFeedback,
+            this.feedbackGiven,
+            this.showFeedbackThankYou,
+            this.isProfessorResponse
+        ]);
+    }
+
+    /**
+     * Scrolls the panel back to the top. Called after every screen transition so that
+     * important information isn't left hidden below the fold from a previous screen's scroll position.
+     */
+    private scrollContentToTop(): void {
+        this.node.scrollTop = 0;
+        const container = this.node.querySelector('#ai-assistant-container');
+        if (container) {
+            container.scrollTop = 0;
+        }
+    }
+
+    protected onUpdateRequest(msg: Message): void {
+        const screenKey = this.computeScreenKey();
+        super.onUpdateRequest(msg);
+        if (screenKey !== this.lastScreenKey) {
+            this.lastScreenKey = screenKey;
+            this.scrollContentToTop();
         }
     }
 
@@ -393,6 +467,7 @@ export class AiAsistentWidget extends ReactWidget {
                     </h4>
                     <div
                         className="ai-response-content"
+                        onClick={this.handleResponseLinkClick}
                         dangerouslySetInnerHTML={{ __html: this.markdownRenderer.render(this.aiResponse) }}
                     />
 
@@ -987,6 +1062,11 @@ export class AiAsistentWidget extends ReactWidget {
     }
 
     private async proceedWithCompileWarnWarning() {
+        // Guard against double-clicks
+        if (this.isProcessing) {
+            console.log('AI Assistant: Ignoring proceed click - already processing');
+            return;
+        }
         this.showCompileWarnWarning = false;
         // Re-fetch files and proceed
         const context = this.warningContext;
@@ -996,6 +1076,11 @@ export class AiAsistentWidget extends ReactWidget {
     }
 
     private async proceedWithStaleGccWarning() {
+        // Guard against double-clicks
+        if (this.isProcessing) {
+            console.log('AI Assistant: Ignoring proceed click - already processing');
+            return;
+        }
         this.showStaleGccWarning = false;
         // Re-fetch both files
         const context = this.warningContext;
@@ -1015,6 +1100,11 @@ export class AiAsistentWidget extends ReactWidget {
     }
 
     private async proceedWithStaleAsanWarning() {
+        // Guard against double-clicks
+        if (this.isProcessing) {
+            console.log('AI Assistant: Ignoring proceed click - already processing');
+            return;
+        }
         this.showStaleAsanWarning = false;
         // Re-fetch both files
         const context = this.warningContext;
@@ -1371,11 +1461,8 @@ export class AiAsistentWidget extends ReactWidget {
     }
 
     private async submitCompileRequest(action: string, relativePath: string, code: string, gccOutput: string, task?: string) {
-        // Guard against double-clicks
-        if (this.isProcessing) {
-            console.log('AI Assistant: Ignoring compile request - already processing');
-            return;
-        }
+        // Note: no isProcessing guard here - callers (handleCompileError etc.) already set
+        // isProcessing themselves and are responsible for their own double-click protection.
         await this.gateResponseType(responseType =>
             this.executeCompileRequest(action, relativePath, code, gccOutput, task, responseType)
         );
@@ -1420,11 +1507,8 @@ export class AiAsistentWidget extends ReactWidget {
     }
 
     private async submitCrashRequest(action: string, relativePath: string, code: string, asanOutput: string, task?: string) {
-        // Guard against double-clicks
-        if (this.isProcessing) {
-            console.log('AI Assistant: Ignoring crash request - already processing');
-            return;
-        }
+        // Note: no isProcessing guard here - callers (handleProgramCrash etc.) already set
+        // isProcessing themselves and are responsible for their own double-click protection.
         await this.gateResponseType(responseType =>
             this.executeCrashRequest(relativePath, code, asanOutput, task, responseType)
         );
