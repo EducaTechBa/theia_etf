@@ -1221,8 +1221,9 @@ export class AiAsistentWidget extends ReactWidget {
             if (result.data && result.data.length > 20) {
                 this.flushTypingQueue(); // Flush any remaining characters in typing queue
                 this.aiResponse = result.data; // Set final complete response
-                this.feedbackGiven = false; // Reset so feedback buttons show again
-                this.showFeedbackThankYou = false;
+                // Feedback was already given for this exchange - show thank you, not another prompt
+                this.feedbackGiven = true;
+                this.showFeedbackThankYou = true;
                 this.isProfessorResponse = true; // Mark as professor response
             } else {
                 // Short response or no data - just show thank you
@@ -1427,6 +1428,9 @@ export class AiAsistentWidget extends ReactWidget {
             this.clearTypingState();
             this.aiResponse = '';
             this.isProfessorResponse = false;
+            this.feedbackGiven = false;
+            this.showFeedbackThankYou = false;
+            this.isProcessingFeedback = false;
             this.update();
 
             const result = await this.aiService.submitOutputRequest(
@@ -1475,6 +1479,9 @@ export class AiAsistentWidget extends ReactWidget {
             this.clearTypingState();
             this.aiResponse = '';
             this.isProfessorResponse = false;
+            this.feedbackGiven = false;
+            this.showFeedbackThankYou = false;
+            this.isProcessingFeedback = false;
             this.update();
 
             const result = await this.aiService.submitCompileRequest(
@@ -1521,6 +1528,9 @@ export class AiAsistentWidget extends ReactWidget {
             this.clearTypingState();
             this.aiResponse = '';
             this.isProfessorResponse = false;
+            this.feedbackGiven = false;
+            this.showFeedbackThankYou = false;
+            this.isProcessingFeedback = false;
             this.update();
 
             const result = await this.aiService.submitCrashRequest(
@@ -1725,6 +1735,9 @@ export class AiAsistentWidget extends ReactWidget {
             this.clearTypingState();
             this.aiResponse = '';
             this.isProfessorResponse = false;
+            this.feedbackGiven = false;
+            this.showFeedbackThankYou = false;
+            this.isProcessingFeedback = false;
             this.update();
 
             const result = await this.aiService.submitAutotestRequest(
