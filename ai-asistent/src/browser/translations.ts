@@ -88,6 +88,16 @@ export interface Translations {
     staleGccMessage: string;
     staleAsanTitle: string;
     staleAsanMessage: string;
+
+    // Response type selector (V2 backend)
+    responseTypeTitle: string;
+    responseTypeQuestion: string;
+    responseTypeHint: string;
+    responseTypeHintDesc: string;
+    responseTypeBook: string;
+    responseTypeBookDesc: string;
+    responseTypePractice: string;
+    responseTypePracticeDesc: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -170,6 +180,15 @@ export const translations: Record<Language, Translations> = {
         staleGccMessage: "Source code has been modified after last compilation. Compilation errors may no longer be accurate. I recommend running your program again to update the errors.",
         staleAsanTitle: "⚠️ WARNING - Stale Crash Report",
         staleAsanMessage: "Source code has been modified after the last program crash. Crash report may no longer be accurate. I recommend running your program again to update the report.",
+
+        responseTypeTitle: "How would you like to be helped?",
+        responseTypeQuestion: "Choose the kind of assistance you'd like:",
+        responseTypeHint: "Give me a hint",
+        responseTypeHintDesc: "A short nudge in the right direction, without giving away the solution",
+        responseTypeBook: "Relevant book chapters",
+        responseTypeBookDesc: "Point me to the textbook sections that cover this",
+        responseTypePractice: "Worked examples",
+        responseTypePracticeDesc: "Show me similar solved assignments",
     },
     bs: {
         greeting: "Zdravo, ja sam vaš AI asistent za nastavu!",
@@ -249,6 +268,15 @@ export const translations: Record<Language, Translations> = {
         staleGccMessage: "Izvorni kod je promijenjen nakon posljednjeg kompajliranja. Greške kompajliranja možda više nisu tačne. Preporučujem da ponovo pokrenete program da bi se greške kompajliranja ažurirale.",
         staleAsanTitle: "⚠️ UPOZORENJE - Zastarjeli izvještaj o krahiranju",
         staleAsanMessage: "Izvorni kod je promijenjen nakon posljednjeg krahiranja programa. Izvještaj o krahiranju možda više nije tačan. Preporučujem da ponovo pokrenete program (Run) da bi se izvještaj ažurirao.",
+
+        responseTypeTitle: "Kako želite da vam pomognem?",
+        responseTypeQuestion: "Odaberite vrstu pomoći koju želite:",
+        responseTypeHint: "Daj mi savjet",
+        responseTypeHintDesc: "Kratka smjernica u pravom smjeru, bez otkrivanja rješenja",
+        responseTypeBook: "Relevantna poglavlja iz knjige",
+        responseTypeBookDesc: "Uputi me na dijelove udžbenika koji pokrivaju ovu temu",
+        responseTypePractice: "Riješeni primjeri",
+        responseTypePracticeDesc: "Pokaži mi slične riješene zadatke",
     }
 };
 

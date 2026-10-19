@@ -10,7 +10,10 @@ import { comingSoonImage, friendlyAssistantImage, tiredAssistantImage } from './
 import MarkdownIt = require('markdown-it');
 import { t, Language, Translations } from './translations';
 import { AIAsistentService } from './ai-asistent-service';
-import { WarningContext } from './ai-asistent-types';
+import { WarningContext, ResponseType } from './ai-asistent-types';
+
+// Compile-time switch for the V2 backend (still in testing). Flip to false to revert to V1 behavior.
+const V2 = true;
 
 @injectable()
 export class AiAsistentWidget extends ReactWidget {
@@ -77,6 +80,10 @@ export class AiAsistentWidget extends ReactWidget {
     private showStaleGccWarning: boolean = false;
     private showStaleAsanWarning: boolean = false;
     private warningContext: WarningContext = {}; // Store context for "Proceed anyway" actions
+
+    // Response type selector state (V2 backend)
+    private showResponseTypeSelector: boolean = false;
+    private pendingResponseAction: ((responseType?: ResponseType) => Promise<void>) | undefined = undefined;
 
     // Localization
     private language: Language = 'bs'; // Default to Bosnian
@@ -187,6 +194,31 @@ export class AiAsistentWidget extends ReactWidget {
         this.update();
     }
 
+    /**
+     * V2 backend: after existing validation checks pass, let the user pick the desired
+     * kind of assistance (hint / book chapters / worked examples) before submitting.
+     * When V2 is off, submits immediately without asking.
+     */
+    private async gateResponseType(action: (responseType?: ResponseType) => Promise<void>): Promise<void> {
+        if (V2) {
+            this.pendingResponseAction = action;
+            this.showResponseTypeSelector = true;
+            this.isProcessing = false;
+            this.update();
+        } else {
+            await action(undefined);
+        }
+    }
+
+    private async chooseResponseType(responseType: ResponseType): Promise<void> {
+        const action = this.pendingResponseAction;
+        this.showResponseTypeSelector = false;
+        this.pendingResponseAction = undefined;
+        if (action) {
+            await action(responseType);
+        }
+    }
+
     private async checkAvailability(): Promise<void> {
         try {
             const response = await fetch('/api/v1/ai/asistent?action=isAvailable', {
@@ -269,7 +301,7 @@ export class AiAsistentWidget extends ReactWidget {
 
             {!this.isProcessing && !this.aiResponse && !this.errorMessage && this.outputWrongStep === 0 &&
              !this.showCrashWarning && !this.showWhitespaceWarning && !this.showCompileWarnWarning &&
-             !this.showStaleGccWarning && !this.showStaleAsanWarning && (
+             !this.showStaleGccWarning && !this.showStaleAsanWarning && !this.showResponseTypeSelector && (
                 <>
                     <div className='ai-assistant-greeting' style={{ textAlign: 'center' }}>
                         <img
@@ -294,6 +326,7 @@ export class AiAsistentWidget extends ReactWidget {
             {!this.isProcessing && this.outputWrongStep === 2 && this.renderOutputWrongInputForm()}
             {!this.isProcessing && this.outputWrongStep === 3 && this.renderOutputWrongExpectedForm()}
 
+            {this.showResponseTypeSelector && this.renderResponseTypeSelector()}
             {this.showCrashWarning && this.renderCrashWarning()}
             {this.showWhitespaceWarning && this.renderGenericWarning('whitespaceWarningTitle', 'whitespaceWarningMessage', () => this.proceedWithWhitespaceWarning())}
             {this.showCompileWarnWarning && this.renderGenericWarning('compileWarnTitle', 'compileWarnMessage', () => this.proceedWithCompileWarnWarning())}
@@ -413,6 +446,8 @@ export class AiAsistentWidget extends ReactWidget {
         this.showStaleGccWarning = false;
         this.showStaleAsanWarning = false;
         this.warningContext = {};
+        this.showResponseTypeSelector = false;
+        this.pendingResponseAction = undefined;
         this.update();
     }
 
@@ -780,6 +815,47 @@ export class AiAsistentWidget extends ReactWidget {
         </div>;
     }
 
+    private renderResponseTypeSelector(): React.ReactNode {
+        const options: Array<{ type: ResponseType; icon: string; labelKey: keyof Translations; descKey: keyof Translations }> = [
+            { type: 'hint', icon: 'fa-lightbulb-o', labelKey: 'responseTypeHint', descKey: 'responseTypeHintDesc' },
+            { type: 'book', icon: 'fa-book', labelKey: 'responseTypeBook', descKey: 'responseTypeBookDesc' },
+            { type: 'practice', icon: 'fa-graduation-cap', labelKey: 'responseTypePractice', descKey: 'responseTypePracticeDesc' },
+        ];
+
+        return <div style={{ padding: '20px' }}>
+            <h3 style={{ marginBottom: '10px' }}>{t(this.language, 'responseTypeTitle')}</h3>
+            <p style={{ marginBottom: '15px', fontSize: '13px', opacity: 0.8 }}>
+                {t(this.language, 'responseTypeQuestion')}
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '15px' }}>
+                {options.map(option => (
+                    <button
+                        key={option.type}
+                        className="theia-button secondary"
+                        onClick={() => this.chooseResponseType(option.type)}
+                        style={{ display: 'flex', alignItems: 'flex-start', textAlign: 'left', padding: '10px 15px' }}
+                    >
+                        <i className={`fa ${option.icon}`} style={{ fontSize: '18px', marginRight: '10px', marginTop: '2px' }}></i>
+                        <span>
+                            <strong>{t(this.language, option.labelKey)}</strong>
+                            <div style={{ fontSize: '12px', opacity: 0.8, marginTop: '2px' }}>
+                                {t(this.language, option.descKey)}
+                            </div>
+                        </span>
+                    </button>
+                ))}
+            </div>
+
+            <button
+                className="theia-button"
+                onClick={() => this.clearResponse()}
+            >
+                {t(this.language, 'cancel')}
+            </button>
+        </div>;
+    }
+
     private renderCrashWarning(): React.ReactNode {
         return <div style={{ padding: '20px' }}>
             <div style={{
@@ -840,46 +916,16 @@ export class AiAsistentWidget extends ReactWidget {
             return;
         }
 
-        try {
-            this.isProcessing = true;
-            this.showCrashWarning = false;
-            this.errorMessage = '';
-            this.clearTypingState();
-            this.aiResponse = '';
-            this.isProfessorResponse = false;
-            this.update();
+        this.showCrashWarning = false;
+        const relativePath = this.crashPath;
+        const code = this.crashCode;
+        const task = this.crashTask;
+        this.crashCode = '';
+        this.crashPath = '';
+        this.crashTask = '';
 
-            // Call API with empty asan output (guessing mode)
-            const result = await this.aiService.submitCrashRequest(
-                'crash',
-                this.crashPath,
-                this.crashCode,
-                '', // Empty - AI will guess
-                this.crashTask,
-                this.handlePartialResponse
-            );
-
-            if (result.error) {
-                if (result.error === 'QUOTA_EXCEEDED') {
-                    this.quotaExceeded = true;
-                } else {
-                    this.errorMessage = result.error;
-                }
-            } else {
-                this.flushTypingQueue();
-                this.aiResponse = result.data || '';
-            }
-
-        } catch (error) {
-            console.error('AI Assistant: Error in proceedWithCrashAnalysis', error);
-            this.errorMessage = `Unexpected error: ${error}`;
-        } finally {
-            this.isProcessing = false;
-            this.crashCode = '';
-            this.crashPath = '';
-            this.crashTask = '';
-            this.update();
-        }
+        // Call API with empty asan output (guessing mode)
+        await this.submitCrashRequest('crash', relativePath, code, '', task);
     }
 
     private renderGenericWarning(titleKey: keyof Translations, messageKey: keyof Translations, onProceed: () => void): React.ReactNode {
@@ -1280,9 +1326,13 @@ export class AiAsistentWidget extends ReactWidget {
             return;
         }
 
+        this.outputWrongStep = 0;
+        await this.gateResponseType(responseType => this.executeOutputWrongRequest(action, responseType));
+    }
+
+    private async executeOutputWrongRequest(action: string, responseType?: ResponseType) {
         try {
             this.isProcessing = true;
-            this.outputWrongStep = 0;
             this.errorMessage = '';
             this.clearTypingState();
             this.aiResponse = '';
@@ -1297,6 +1347,7 @@ export class AiAsistentWidget extends ReactWidget {
                 this.programOutput,
                 this.expectedOutput,
                 this.currentTask,
+                responseType,
                 this.handlePartialResponse
             );
 
@@ -1325,7 +1376,12 @@ export class AiAsistentWidget extends ReactWidget {
             console.log('AI Assistant: Ignoring compile request - already processing');
             return;
         }
+        await this.gateResponseType(responseType =>
+            this.executeCompileRequest(action, relativePath, code, gccOutput, task, responseType)
+        );
+    }
 
+    private async executeCompileRequest(action: string, relativePath: string, code: string, gccOutput: string, task?: string, responseType?: ResponseType) {
         try {
             this.isProcessing = true;
             this.errorMessage = '';
@@ -1340,6 +1396,7 @@ export class AiAsistentWidget extends ReactWidget {
                 code,
                 gccOutput,
                 task,
+                responseType,
                 this.handlePartialResponse
             );
 
@@ -1368,7 +1425,12 @@ export class AiAsistentWidget extends ReactWidget {
             console.log('AI Assistant: Ignoring crash request - already processing');
             return;
         }
+        await this.gateResponseType(responseType =>
+            this.executeCrashRequest(relativePath, code, asanOutput, task, responseType)
+        );
+    }
 
+    private async executeCrashRequest(relativePath: string, code: string, asanOutput: string, task?: string, responseType?: ResponseType) {
         try {
             this.isProcessing = true;
             this.errorMessage = '';
@@ -1383,6 +1445,7 @@ export class AiAsistentWidget extends ReactWidget {
                 code,
                 asanOutput,
                 task,
+                responseType,
                 this.handlePartialResponse
             );
 
@@ -1557,13 +1620,36 @@ export class AiAsistentWidget extends ReactWidget {
                 return;
             }
 
-            // Step 5: Call API
+            // Step 5: Choose assistance type (V2) and call API
+            await this.gateResponseType(responseType =>
+                this.executeAutotestRequest(relativePath, code, autotestContent, atResultContent, task, responseType)
+            );
+
+        } catch (error) {
+            console.error('AI Assistant: Error handling tests failing', error);
+            this.errorMessage = `Unexpected error: ${error}`;
+        } finally {
+            this.isProcessing = false;
+            this.update();
+        }
+    }
+
+    private async executeAutotestRequest(relativePath: string, code: string, autotestContent: string, atResultContent: string, task: string | undefined, responseType?: ResponseType) {
+        try {
+            this.isProcessing = true;
+            this.errorMessage = '';
+            this.clearTypingState();
+            this.aiResponse = '';
+            this.isProfessorResponse = false;
+            this.update();
+
             const result = await this.aiService.submitAutotestRequest(
                 relativePath,
                 code,
                 autotestContent,
                 atResultContent,
                 task,
+                responseType,
                 this.handlePartialResponse
             );
 
@@ -1581,9 +1667,8 @@ export class AiAsistentWidget extends ReactWidget {
                 this.flushTypingQueue();
                 this.aiResponse = result.data || '';
             }
-
         } catch (error) {
-            console.error('AI Assistant: Error handling tests failing', error);
+            console.error('AI Assistant: Error submitting autotest request', error);
             this.errorMessage = `Unexpected error: ${error}`;
         } finally {
             this.isProcessing = false;

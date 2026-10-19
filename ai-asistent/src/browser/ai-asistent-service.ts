@@ -1,7 +1,7 @@
 import { injectable } from 'inversify';
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
 import URI from '@theia/core/lib/common/uri';
-import { ApiResponse } from './ai-asistent-types';
+import { ApiResponse, ResponseType } from './ai-asistent-types';
 
 export interface ValidationResult {
     valid: boolean;
@@ -200,6 +200,7 @@ export class AIAsistentService {
         output: string,
         expected: string,
         task?: string,
+        response?: ResponseType,
         onPartialResponse?: (partialText: string) => void
     ): Promise<ApiResponse> {
         const formData = new FormData();
@@ -211,6 +212,9 @@ export class AIAsistentService {
         formData.append('expected', expected);
         if (task) {
             formData.append('task', task);
+        }
+        if (response) {
+            formData.append('response', response);
         }
 
         return this.submitRequest(formData, onPartialResponse);
@@ -225,6 +229,7 @@ export class AIAsistentService {
         code: string,
         gccOutput: string,
         task?: string,
+        response?: ResponseType,
         onPartialResponse?: (partialText: string) => void
     ): Promise<ApiResponse> {
         const formData = new FormData();
@@ -234,6 +239,9 @@ export class AIAsistentService {
         formData.append('output', gccOutput);
         if (task) {
             formData.append('task', task);
+        }
+        if (response) {
+            formData.append('response', response);
         }
 
         return this.submitRequest(formData, onPartialResponse);
@@ -248,6 +256,7 @@ export class AIAsistentService {
         code: string,
         asanOutput: string,
         task?: string,
+        response?: ResponseType,
         onPartialResponse?: (partialText: string) => void
     ): Promise<ApiResponse> {
         const formData = new FormData();
@@ -257,6 +266,9 @@ export class AIAsistentService {
         formData.append('asan', asanOutput);
         if (task) {
             formData.append('task', task);
+        }
+        if (response) {
+            formData.append('response', response);
         }
 
         return this.submitRequest(formData, onPartialResponse);
@@ -271,6 +283,7 @@ export class AIAsistentService {
         autotestContent: string,
         atResultContent: string,
         task?: string,
+        response?: ResponseType,
         onPartialResponse?: (partialText: string) => void
     ): Promise<ApiResponse> {
         const formData = new FormData();
@@ -281,6 +294,9 @@ export class AIAsistentService {
         formData.append('result', atResultContent);
         if (task) {
             formData.append('task', task);
+        }
+        if (response) {
+            formData.append('response', response);
         }
 
         return this.submitRequest(formData, onPartialResponse);

@@ -24,3 +24,6 @@ export type ActionType =
     | 'crash'
     | 'tests'
     | 'feedback';
+
+// V2 backend: desired assistance type, chosen after the existing validation checks pass
+export type ResponseType = 'hint' | 'book' | 'practice';
