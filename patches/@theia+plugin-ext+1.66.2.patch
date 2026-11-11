@@ -59,33 +59,6 @@ index e13611c..45af9f1 100644
  /**
   * Wraps and underlying channel to send/receive multiple messages in one go:
   *  - multiple messages to be sent from one stack get sent in bulk at `process.nextTick`.
-diff --git a/node_modules/@theia/plugin-ext/lib/hosted/browser/hosted-plugin.js b/node_modules/@theia/plugin-ext/lib/hosted/browser/hosted-plugin.js
-index 75991a8..ae1c35d 100644
---- a/node_modules/@theia/plugin-ext/lib/hosted/browser/hosted-plugin.js
-+++ b/node_modules/@theia/plugin-ext/lib/hosted/browser/hosted-plugin.js
-@@ -219,8 +219,20 @@ let HostedPluginSupport = HostedPluginSupport_1 = class HostedPluginSupport exte
-     }
-     initRpc(host, pluginId) {
-         const rpc = host === 'frontend' ? new plugin_worker_1.PluginWorker().rpc : this.createServerRpc(host);
--        (0, main_context_1.setUpPluginApi)(rpc, this.container);
--        this.mainPluginApiProviders.getContributions().forEach(p => p.initialize(rpc, this.container));
-+
-+        // RECONNECTION FIX: Delay initialization to give plugin-host time to start
-+        // Without delay, frontend floods backend with RPC requests during plugin-host startup,
-+        // starving plugin-host of CPU and delaying initialization (vicious cycle)
-+        if (host !== 'frontend') {
-+            setTimeout(() => {
-+                (0, main_context_1.setUpPluginApi)(rpc, this.container);
-+                this.mainPluginApiProviders.getContributions().forEach(p => p.initialize(rpc, this.container));
-+            }, 1000); // 1000ms delay for plugin-host to initialize
-+        } else {
-+            (0, main_context_1.setUpPluginApi)(rpc, this.container);
-+            this.mainPluginApiProviders.getContributions().forEach(p => p.initialize(rpc, this.container));
-+        }
-+
-         return rpc;
-     }
-     createServerRpc(pluginHostId) {
 diff --git a/node_modules/@theia/plugin-ext/lib/hosted/node/hosted-plugin-process.js b/node_modules/@theia/plugin-ext/lib/hosted/node/hosted-plugin-process.js
 index d1e3e29..cc5b197 100644
 --- a/node_modules/@theia/plugin-ext/lib/hosted/node/hosted-plugin-process.js
