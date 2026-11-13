@@ -83,15 +83,65 @@ export class TopBarContribution extends AbstractViewContribution<TopBarWidget> i
         });
     }
 
+    /** Terminal ids that existed before the current debug session started. */
+    private terminalsBeforeDebug: Set<string> = new Set();
+
+    /** Debug terminals whose input has been locked after their session ended. */
+    private lockedDebugTerminals: Set<string> = new Set();
+
+    /**
+     * Enables or disables keyboard input of a terminal while keeping its output visible.
+     * Programmatic input (sendText/executeCommand, used by the debugger) is not affected.
+     * Relies on Theia/xterm internals: the `isAttachedCloseListener` flag gates forwarding of typed
+     * data to the backend in TerminalWidgetImpl, and xterm's `disableStdin` ignores keys and paste.
+     */
+    private setTerminalInputEnabled(terminal: unknown, enabled: boolean): void {
+        const widget = terminal as { isAttachedCloseListener?: boolean; term?: { options?: { disableStdin?: boolean } } };
+        widget.isAttachedCloseListener = !enabled;
+        if (widget.term?.options) {
+            widget.term.options.disableStdin = !enabled;
+        }
+    }
+
+    private closeLockedDebugTerminals(): void {
+        this.terminalService.all
+            .filter(t => this.lockedDebugTerminals.has(t.id))
+            .forEach(t => t.close());
+        this.lockedDebugTerminals.clear();
+    }
+
     @postConstruct()
     // @ts-ignore
     private init() {
-        this.debugSessionManager.onDidDestroyDebugSession(debugSession => {
+        // Debug adapters run the debuggee in an integrated terminal (runInTerminal). When the
+        // program ends, that terminal falls back to an interactive shell prompt, which we do not
+        // want students to use. Keep the output visible (like the Run button does) but lock the
+        // terminal's input when the last debug session ends. The locked terminal is closed when
+        // the next debug session starts, so terminals do not accumulate.
+        this.debugSessionManager.onWillStartDebugSession(() => {
+            if (this.debugSessionManager.sessions.length > 0) {
+                return;
+            }
+            this.closeLockedDebugTerminals();
+            this.terminalsBeforeDebug = new Set(this.terminalService.all.map(t => t.id));
+        });
+        this.debugSessionManager.onDidDestroyDebugSession(() => {
             this.terminalService.all.forEach(terminalWidget => {
                 if (terminalWidget.title.label.includes('cppdbg')) {
                     terminalWidget.close();
                 }
-            })
+            });
+            if (this.debugSessionManager.sessions.length > 0) {
+                return;
+            }
+            // Titles differ per adapter/configuration, so identify the debug terminals as those
+            // created since the session started.
+            this.terminalService.all
+                .filter(t => !this.terminalsBeforeDebug.has(t.id))
+                .forEach(t => {
+                    this.setTerminalInputEnabled(t, false);
+                    this.lockedDebugTerminals.add(t.id);
+                });
         });
     }
 
